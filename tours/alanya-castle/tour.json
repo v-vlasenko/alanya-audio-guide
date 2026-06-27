@@ -13,6 +13,15 @@
   },
   "_coordsWarning": "ALL lat/lng below are ROUGH, UNVERIFIED placeholders so the app is runnable. They are NOT accurate enough for 30 m geofencing. Before the trip, replace each with a measured coordinate (Google Maps: right-click -> click coordinates to copy), then set coordsVerified=true. Manual list/map playback works regardless of coordinates.",
   "audioPathNote": "Each checkpoint 'audio' is relative to basePath, i.e. full path = basePath + audio.",
+  "waypoints": [
+    {
+      "id": "cilvarda-burnu",
+      "title": "Чілварда Бурну — маяк і монастир",
+      "description": "Найдальша точка мису. Французький маяк 1880 р. (20 миль видимості) та руїни візантійського монастиря XI–XII ст. — два тисячоліття в одній точці. ⚠ Координати приблизні, перевірте на місці.",
+      "lat": 36.5262,
+      "lng": 32.0088
+    }
+  ],
   "checkpoints": [
     {
       "id": "01-intro",

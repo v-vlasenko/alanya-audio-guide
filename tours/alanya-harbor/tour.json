@@ -16,6 +16,15 @@
   "tip": "Червону вежу й Корабельню описано в турі «Аланійська фортеця». Зупинка 4 (Будинок Ататюрка) — необов'язковий відступ ~1,5 км на північ у квартал Шекерхане.",
   "_coordsWarning": "lat/lng marked coordsVerified=false are approximate; verified=true come from mapped landmarks. Manual playback works regardless.",
   "audioPathNote": "Full path = basePath + audio.",
+  "waypoints": [
+    {
+      "id": "tersane",
+      "title": "Терсане — Сельджуцька корабельня (1228)",
+      "description": "Єдина збережена сельджуцька корабельня в Середземномор'ї. Побудована за наказом Алаеддіна Кейкубата — 5 склепінних арок, 56 м фасад. За 8 років перетворила Аланію на морську державу. Поруч із Червоною вежею.",
+      "lat": 36.5342,
+      "lng": 31.9987
+    }
+  ],
   "checkpoints": [
     {
       "id": "01-harbor",

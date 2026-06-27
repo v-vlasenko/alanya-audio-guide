@@ -299,11 +299,12 @@ function renderList() {
 
 /* ================= MAP (Leaflet + bundled tiles + live dot) ================= */
 let map = null, meLayer = null, watchId = null, didFit = false;
+let wpMarkers = [], showWp = true;
 
 function teardownMap() {
   if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
   if (map) { map.remove(); map = null; }
-  meLayer = null; didFit = false;
+  meLayer = null; didFit = false; wpMarkers = []; showWp = true;
 }
 
 async function renderMap() {
@@ -314,6 +315,7 @@ async function renderMap() {
       <div id="map"></div>
       <button class="recenter" id="recenter" title="${esc(t('gpsToggleLabel'))}">◎</button>
       <button class="layer-btn" id="layer-btn" title="Супутниковий вигляд">🛰</button>
+      <button class="wp-btn" id="wp-toggle" title="Показати/сховати точки інтересу">ℹ</button>
     </div>`;
 
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
@@ -376,12 +378,24 @@ async function renderMap() {
 
   // info-only waypoints (no audio, map popup only)
   (activeTour.waypoints || []).forEach((wp) => {
-    const icon = L.divIcon({ className: '', html: '<div class="wp-pin">ℹ</div>', iconSize: [28, 28], iconAnchor: [14, 28] });
-    L.marker([wp.lat, wp.lng], { icon }).addTo(map)
+    const icon = L.divIcon({ className: '', html: '<div class="wp-pin"><span>ℹ</span></div>', iconSize: [28, 28], iconAnchor: [14, 28] });
+    const wpMk = L.marker([wp.lat, wp.lng], { icon }).addTo(map)
       .bindPopup(`<b>${wp.title}</b><br><span style="font-size:13px">${wp.description}</span>`, { maxWidth: 220 })
       .on('click', () => haptic());
+    wpMarkers.push(wpMk);
     pts.push([wp.lat, wp.lng]);
   });
+
+  const hasWp = (activeTour.waypoints || []).length > 0;
+  $('#wp-toggle').hidden = !hasWp;
+  if (hasWp) {
+    $('#wp-toggle').onclick = () => {
+      showWp = !showWp;
+      wpMarkers.forEach((m) => (showWp ? m.addTo(map) : map.removeLayer(m)));
+      $('#wp-toggle').classList.toggle('off', !showWp);
+      haptic(8);
+    };
+  }
 
   if (bbox) map.fitBounds([[bbox.s, bbox.w], [bbox.n, bbox.e]]);
   else if (pts.length) map.fitBounds(pts, { padding: [30, 30] });
