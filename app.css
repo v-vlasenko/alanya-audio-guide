@@ -91,6 +91,7 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .cp .t b{display:block; font-size:17px}
 .cp .t small{color:var(--muted)}
 .cp .state{font-size:13px; color:var(--good)}
+.cp .state.done{font-weight:800; font-size:16px}
 .badge{display:inline-block; font-size:12px; font-weight:700; color:#ffd28a;
   background:#3a2a12; border-radius:8px; padding:2px 8px; margin-top:4px}
 
@@ -125,7 +126,8 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .player .pt .close{margin-left:auto; color:var(--muted); font-size:22px; width:32px}
 .seek{display:flex; align-items:center; gap:10px; font-size:13px; color:var(--muted)}
 .seek input[type=range]{flex:1; accent-color:var(--accent); height:32px}
-.pcontrols{display:flex; gap:10px; margin:10px 0 6px}
+.pcontrols{display:flex; gap:10px; margin:10px 0 4px}
+.p-speed-row{text-align:right; margin-bottom:6px}
 .pcontrols .btn{min-height:54px}
 .transcript{max-height:26vh; overflow:auto; color:var(--fg); font-size:16px; line-height:1.5;
   background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-top:8px;
@@ -141,6 +143,13 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
   background:#4a1f12; color:#ffd9c2; border:1px solid #7a3b22; border-radius:12px; padding:12px 14px; font-size:15px}
 
 .install-hint{margin-top:18px; text-align:center}
+/* ---- completion overlay ---- */
+.completion-overlay{position:fixed; inset:0; z-index:2000; background:rgba(28,20,16,.95);
+  display:flex; align-items:center; justify-content:center}
+.completion-card{background:var(--bg2); border:1px solid var(--line); border-radius:var(--r);
+  padding:32px 24px; text-align:center; max-width:360px; width:90%}
+.completion-emoji{font-size:64px; margin-bottom:12px}
+.completion-actions{display:flex; flex-direction:column; gap:10px; margin-top:20px}
 .toast{position:fixed; left:50%; bottom:calc(var(--safe-b) + 90px); transform:translateX(-50%);
   background:#000; color:#fff; padding:10px 16px; border-radius:20px; z-index:1400; font-size:15px; opacity:.95}
 [hidden]{display:none!important}

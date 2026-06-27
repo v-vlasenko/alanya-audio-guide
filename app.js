@@ -18,6 +18,7 @@ const el = (html) => { const d = document.createElement('div'); d.innerHTML = ht
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const cacheName = (id, version) => `tour-${id}-${version}`;
 const fmtTime = (s) => { s = Math.floor(s || 0); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const haptic = (ms = 10) => navigator.vibrate?.(ms);
 
 /* slippy-tile math (mirrors scripts/fetch-tiles.mjs) */
 const lon2x = (lon, z) => Math.floor(((lon + 180) / 360) * 2 ** z);
@@ -214,6 +215,7 @@ async function tourAssetUrls(tr) {
 /* ================= TOUR VIEW ================= */
 let activeTour = null;
 let visitedSet = new Set();
+let completedSet = new Set();
 
 async function loadTour(id) {
   if (tourCache.has(id)) return tourCache.get(id);
@@ -231,6 +233,7 @@ async function renderTour(id) {
   catch { app.innerHTML = `<p>${esc(t('notDownloadedHint'))}</p><button class="btn" onclick="location.hash='#/'">${esc(t('backToTours'))}</button>`; return; }
   activeTour = tour;
   visitedSet = loadVisited(id);
+  completedSet = loadCompleted(id);
 
   app.innerHTML = `
     <div class="topbar">
@@ -248,7 +251,14 @@ async function renderTour(id) {
     <div class="player" id="player"></div>
   `;
   $('#back').onclick = () => { location.hash = '#/'; };
-  $('#start').onclick = () => { playIndex(0); };
+  const savedIdx = loadProgress(id);
+  if (savedIdx >= 0 && savedIdx < tour.checkpoints.length) {
+    const cp = ordered()[savedIdx];
+    if (cp) $('#start').textContent = `▶ Продовжити: ${cp.shortTitle || cp.title}`;
+    $('#start').onclick = () => { haptic(); playIndex(savedIdx); };
+  } else {
+    $('#start').onclick = () => { haptic(); playIndex(0); };
+  }
   $('#tab-list').onclick = () => switchTab('list');
   $('#tab-map').onclick = () => switchTab('map');
   buildPlayer();
@@ -280,8 +290,9 @@ function renderList() {
         </span>
         <span class="num play">▶︎</span>
       </button>`);
-    if (visitedSet.has(cp.id)) $('.state', row).textContent = t('visited');
-    row.onclick = () => playIndex(i);
+    if (completedSet.has(cp.id)) { const s = $('.state', row); s.textContent = '✓'; s.classList.add('done'); }
+    else if (visitedSet.has(cp.id)) $('.state', row).textContent = t('visited');
+    row.onclick = () => { haptic(); playIndex(i); };
     list.appendChild(row);
   });
 }
@@ -314,7 +325,7 @@ async function renderMap() {
   let bbox = null;
   try { bbox = (await fetch(`${base}tiles/meta.json`).then((r) => r.json())).bbox; } catch {}
 
-  map = L.map('map', { zoomControl: true, attributionControl: true });
+  map = L.map('map', { zoomControl: true, attributionControl: true, doubleClickZoom: true });
 
   // Hybrid layer: serves local offline tiles first; falls back to Esri online for
   // tiles outside the pre-downloaded bbox (so the map looks complete when online).
@@ -363,7 +374,7 @@ async function renderMap() {
     const cls = cp.optional ? 'pin optional' : 'pin';
     const icon = L.divIcon({ className: '', html: `<div class="${cls}"><span>${cp.order}</span></div>`, iconSize: [30, 30], iconAnchor: [15, 30] });
     const mk = L.marker([cp.lat, cp.lng], { icon }).addTo(map);
-    mk.on('click', () => playById(cp.id));
+    mk.on('click', () => { haptic(); playById(cp.id); });
     pts.push([cp.lat, cp.lng]);
   });
 
@@ -397,6 +408,7 @@ function startWatch() {
 
 /* ================= PLAYER ================= */
 let audio = null, curIdx = -1;
+let playSpeed = 1.0;
 
 function buildPlayer() {
   const p = $('#player');
@@ -412,6 +424,7 @@ function buildPlayer() {
       <button class="btn" id="p-play">${esc(t('play'))}</button>
       <button class="btn secondary" id="p-next">${esc(t('next'))}</button>
     </div>
+    <div class="p-speed-row"><button class="btn ghost sm" id="p-speed" title="Швидкість відтворення">1×</button></div>
     <div class="transcript" id="p-transcript"></div>
   `;
   audio = new Audio();
@@ -424,16 +437,29 @@ function buildPlayer() {
   });
   audio.addEventListener('play', () => { const b = $('#p-play'); if (b) b.textContent = t('pause'); markPlaying(true); });
   audio.addEventListener('pause', () => { const b = $('#p-play'); if (b) b.textContent = t('play'); markPlaying(false); });
-  audio.addEventListener('ended', () => { if (activeTour && curIdx < activeTour.checkpoints.length - 1) playIndex(curIdx + 1); });
+  audio.addEventListener('ended', () => {
+    markCompleted(curIdx);
+    if (activeTour && curIdx < activeTour.checkpoints.length - 1) playIndex(curIdx + 1);
+    else if (activeTour) showCompletion();
+  });
   audio.addEventListener('error', () => { toast(t('errorAudioBody')); });
 
   let seeking = false;
   const seek = $('#p-seek');
   seek.addEventListener('input', () => { seeking = true; $('#p-cur').textContent = fmtTime(seek.value); });
   seek.addEventListener('change', () => { audio.currentTime = Number(seek.value); seeking = false; });
-  $('#p-play').onclick = () => { audio.paused ? audio.play() : audio.pause(); };
-  $('#p-prev').onclick = () => { if (curIdx > 0) playIndex(curIdx - 1); };
-  $('#p-next').onclick = () => { if (curIdx < activeTour.checkpoints.length - 1) playIndex(curIdx + 1); };
+  const SPEEDS = [1.0, 1.25, 1.5, 0.75];
+  let speedIdx = 0;
+  $('#p-speed').onclick = () => {
+    speedIdx = (speedIdx + 1) % SPEEDS.length;
+    playSpeed = SPEEDS[speedIdx];
+    audio.playbackRate = playSpeed;
+    $('#p-speed').textContent = playSpeed + '×';
+    haptic(8);
+  };
+  $('#p-play').onclick = () => { haptic(); audio.paused ? audio.play() : audio.pause(); };
+  $('#p-prev').onclick = () => { haptic(); if (curIdx > 0) playIndex(curIdx - 1); };
+  $('#p-next').onclick = () => { haptic(); if (curIdx < activeTour.checkpoints.length - 1) playIndex(curIdx + 1); };
   $('#p-close').onclick = stopPlayer;
 }
 
@@ -444,13 +470,15 @@ function playIndex(i) {
   if (!cp) return;
   curIdx = i;
   audio.src = activeTour.basePath + cp.audio;
+  audio.playbackRate = playSpeed;
+  saveProgress(activeTour.id, i);
   $('#p-title').textContent = `${cp.order}. ${cp.shortTitle || cp.title}`;
   $('#p-transcript').textContent = cp.transcript || '';
   $('#p-transcript').scrollTop = 0;
   $('#player').classList.add('open');
   markVisited(cp.id);
 }
-function playById(id) { const i = ordered().findIndex((c) => c.id === id); if (i >= 0) { switchTab('list'); playIndex(i); } }
+function playById(id) { const i = ordered().findIndex((c) => c.id === id); if (i >= 0) playIndex(i); }
 
 function markPlaying(on) {
   document.querySelectorAll('.cp').forEach((r) => r.classList.remove('playing'));
@@ -470,7 +498,54 @@ function markVisited(cpId) {
   localStorage.setItem('visited-' + activeTour.id, JSON.stringify([...visitedSet]));
   const i = ordered().findIndex((c) => c.id === cpId);
   const row = document.querySelector(`.cp[data-i="${i}"] .state`);
-  if (row) row.textContent = t('visited');
+  if (row && !completedSet.has(cpId)) row.textContent = t('visited');
+}
+
+/* completed persistence (✓ after audio ends) */
+function loadCompleted(id) { try { return new Set(JSON.parse(localStorage.getItem('completed-' + id) || '[]')); } catch { return new Set(); } }
+function markCompleted(idx) {
+  if (!activeTour) return;
+  const cp = ordered()[idx];
+  if (!cp) return;
+  completedSet.add(cp.id);
+  localStorage.setItem('completed-' + activeTour.id, JSON.stringify([...completedSet]));
+  const row = document.querySelector(`.cp[data-i="${idx}"] .state`);
+  if (row) { row.textContent = '✓'; row.classList.add('done'); }
+}
+
+/* progress persistence (resume where user left off) */
+function loadProgress(id) { return parseInt(localStorage.getItem('progress-' + id) ?? '-1', 10); }
+function saveProgress(id, idx) { localStorage.setItem('progress-' + id, idx); }
+
+/* tour completion screen */
+function showCompletion() {
+  localStorage.removeItem('progress-' + activeTour.id);
+  haptic(40);
+  const title = esc(activeTour?.title || '');
+  const overlay = el(`
+    <div class="completion-overlay" id="completion-overlay">
+      <div class="completion-card">
+        <div class="completion-emoji">🎉</div>
+        <h2>Тур завершено!</h2>
+        <p class="muted">${title}</p>
+        <div class="completion-actions">
+          <button class="btn" id="comp-share">Поділитися</button>
+          <button class="btn secondary" id="comp-home">На головну</button>
+          <button class="btn ghost sm" id="comp-replay">Спочатку</button>
+        </div>
+      </div>
+    </div>`);
+  document.body.appendChild(overlay);
+  $('#comp-share', overlay).onclick = async () => {
+    haptic();
+    if (navigator.share) {
+      try { await navigator.share({ title: activeTour?.title, url: location.href }); } catch {}
+    } else {
+      try { await navigator.clipboard.writeText(location.href); toast('Посилання скопійовано'); } catch {}
+    }
+  };
+  $('#comp-home', overlay).onclick = () => { haptic(); overlay.remove(); location.hash = '#/'; };
+  $('#comp-replay', overlay).onclick = () => { haptic(); overlay.remove(); playIndex(0); };
 }
 
 /* ---------- install sheet ---------- */
