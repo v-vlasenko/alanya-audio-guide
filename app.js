@@ -316,29 +316,42 @@ async function renderMap() {
 
   map = L.map('map', { zoomControl: true, attributionControl: true });
 
-  // custom tile layer subclass for Esri satellite (URL order: z/y/x, not z/x/y)
-  const EsriSat = L.TileLayer.extend({
-    getTileUrl(c) {
-      return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${c.z}/${c.y}/${c.x}`;
-    }
-  });
+  // Hybrid layer: serves local offline tiles first; falls back to Esri online for
+  // tiles outside the pre-downloaded bbox (so the map looks complete when online).
+  const ESRI_STREET = (c) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${c.z}/${c.y}/${c.x}`;
+  const ESRI_SAT    = (c) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${c.z}/${c.y}/${c.x}`;
+
+  function makeHybrid(basePath, fallbackUrl) {
+    return L.TileLayer.extend({
+      createTile(coords, done) {
+        const img = document.createElement('img');
+        img.alt = '';
+        img.src = `${basePath}tiles/${coords.z}/${coords.x}/${coords.y}.png`;
+        img.onload = () => done(null, img);
+        img.onerror = () => {
+          img.onerror = () => done(new Error('tile'), img);
+          img.src = fallbackUrl(coords);
+        };
+        return img;
+      },
+    });
+  }
+
+  const HybridStreet = makeHybrid(base, ESRI_STREET);
+  const HybridSat    = makeHybrid(base, ESRI_SAT);
 
   let isSat = false;
-  let curLayer = L.tileLayer(`${base}tiles/{z}/{x}/{y}.png`, {
-    minZoom: 14, maxZoom: 18, attribution: 'Tiles © Esri', errorTileUrl: BLANK,
-  }).addTo(map);
+  let curLayer = new HybridStreet('', { minZoom: 14, maxZoom: 18, attribution: 'Tiles © Esri' }).addTo(map);
 
   $('#layer-btn').onclick = () => {
     isSat = !isSat;
     map.removeLayer(curLayer);
     if (isSat) {
-      curLayer = new EsriSat('', { attribution: 'Tiles © Esri, Maxar', errorTileUrl: BLANK }).addTo(map);
+      curLayer = new HybridSat('', { minZoom: 14, maxZoom: 18, attribution: 'Tiles © Esri, Maxar' }).addTo(map);
       $('#layer-btn').textContent = '🗺';
       $('#layer-btn').title = 'Звичайний вигляд';
     } else {
-      curLayer = L.tileLayer(`${base}tiles/{z}/{x}/{y}.png`, {
-        minZoom: 14, maxZoom: 18, attribution: 'Tiles © Esri', errorTileUrl: BLANK,
-      }).addTo(map);
+      curLayer = new HybridStreet('', { minZoom: 14, maxZoom: 18, attribution: 'Tiles © Esri' }).addTo(map);
       $('#layer-btn').textContent = '🛰';
       $('#layer-btn').title = 'Супутниковий вигляд';
     }
