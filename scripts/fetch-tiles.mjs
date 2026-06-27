@@ -15,11 +15,9 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ZOOM_MIN = 14;
 const ZOOM_MAX = 18;
 const PAD = 0.0035;            // ~350m padding around the stops
-// Esri World Street Map: no API key, attribution-only, tolerates offline bundling
-// for a tiny personal area. NOTE: URL order is z/y/x; we still SAVE as {z}/{x}/{y}.png
-// so the Leaflet template stays {z}/{x}/{y}. (tile.openstreetmap.org blocks bulk
-// downloads — it serves an "Access blocked" notice image, so don't use it here.)
-const TILE_URL = (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${z}/${y}/${x}`;
+// Esri World Imagery: satellite basemap, no API key, attribution-only, tolerates
+// offline bundling for a tiny personal area. URL order is z/y/x; saved as {z}/{x}/{y}.png.
+const TILE_URL = (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
 const UA = 'alanya-audio-guide/1.0 (personal offline PWA)';
 const SLEEP_MS = 60;           // be polite to the tile server
 

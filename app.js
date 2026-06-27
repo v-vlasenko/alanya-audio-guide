@@ -120,7 +120,6 @@ function tourCard(tr) {
           <span>${esc(t('tourSizeLabel'))}: <b>${tr.approxSizeMb}</b> ${esc(t('megabytesShort'))}</span>
         </div>
         <div class="card-actions">
-          <button class="btn open">${esc(t('openTour'))}</button>
           <button class="btn secondary dl">${esc(t('downloadTour'))}</button>
         </div>
         <div class="dl-state muted"></div>
@@ -131,9 +130,10 @@ function tourCard(tr) {
   const img = new Image();
   img.src = `${tr.cover}`;
   img.alt = tr.title;
-  img.onload = () => { $('.cover', card).replaceWith(img); };
+  img.onload = () => { $('.cover', card).replaceWith(img); img.classList.add('cover-img'); };
 
-  $('.open', card).onclick = () => { location.hash = `#/tour/${tr.id}`; };
+  // tap anywhere on card (except action buttons) to open tour
+  card.onclick = (e) => { if (!e.target.closest('.card-actions, .dl-state')) location.hash = `#/tour/${tr.id}`; };
   wireDownload(tr, card);
   return card;
 }
@@ -237,11 +237,11 @@ async function renderTour(id) {
     ${tour.tip ? `<div class="tip">💡 ${esc(tour.tip)}</div>` : ''}
     <button class="btn" id="start">${esc(t('startTour'))}</button>
     <div class="tabs" role="tablist">
-      <button id="tab-list" role="tab" aria-selected="true">${esc(t('tabList'))}</button>
-      <button id="tab-map" role="tab" aria-selected="false">${esc(t('tabMap'))}</button>
+      <button id="tab-list" role="tab" aria-selected="false">${esc(t('tabList'))}</button>
+      <button id="tab-map" role="tab" aria-selected="true">${esc(t('tabMap'))}</button>
     </div>
-    <section id="pane-list"></section>
-    <section id="pane-map" hidden></section>
+    <section id="pane-list" hidden></section>
+    <section id="pane-map"></section>
     <div class="player" id="player"></div>
   `;
   $('#back').onclick = () => { location.hash = '#/'; };
@@ -250,6 +250,7 @@ async function renderTour(id) {
   $('#tab-map').onclick = () => switchTab('map');
   buildPlayer();
   renderList();
+  renderMap();
 }
 
 function switchTab(which) {
@@ -311,7 +312,7 @@ async function renderMap() {
   map = L.map('map', { zoomControl: true, attributionControl: true });
   L.tileLayer(`${base}tiles/{z}/{x}/{y}.png`, {
     minZoom: 14, maxZoom: 18,
-    attribution: 'Tiles © Esri',
+    attribution: 'Tiles © Esri, Maxar',
     errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=',
   }).addTo(map);
 
@@ -367,7 +368,7 @@ function buildPlayer() {
     </div>
     <div class="pcontrols">
       <button class="btn secondary" id="p-prev">${esc(t('previous'))}</button>
-      <button class="btn" id="p-play">${esc(t('pause'))}</button>
+      <button class="btn" id="p-play">${esc(t('play'))}</button>
       <button class="btn secondary" id="p-next">${esc(t('next'))}</button>
     </div>
     <div class="transcript" id="p-transcript"></div>
@@ -406,7 +407,6 @@ function playIndex(i) {
   $('#p-transcript').textContent = cp.transcript || '';
   $('#p-transcript').scrollTop = 0;
   $('#player').classList.add('open');
-  audio.play().catch(() => toast(t('errorAudioBody')));
   markVisited(cp.id);
 }
 function playById(id) { const i = ordered().findIndex((c) => c.id === id); if (i >= 0) { switchTab('list'); playIndex(i); } }

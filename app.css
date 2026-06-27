@@ -45,8 +45,9 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .tours{display:flex; flex-direction:column; gap:16px}
 .tour-card{
   background:var(--card); border:1px solid var(--line); border-radius:var(--r);
-  overflow:hidden;
+  overflow:hidden; cursor:pointer;
 }
+.tour-card:active{opacity:.88}
 .cover{
   height:120px; width:100%;
   background:linear-gradient(135deg,#7a3b22,#c75b39 55%,#e2934f);
