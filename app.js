@@ -64,9 +64,6 @@ async function hardRefresh() {
     const regs = await navigator.serviceWorker.getRegistrations();
     await Promise.all(regs.map((r) => r.unregister()));
   } catch {}
-  for (const key of Object.keys(localStorage)) {
-    if (key !== 'gpsOff') localStorage.removeItem(key);
-  }
   location.reload(true);
 }
 
@@ -303,7 +300,6 @@ function renderList() {
           ${cp.optional ? `<span class="badge">${esc(t('optionalBadge'))}</span>` : ''}
           <span class="state"></span>
         </span>
-        <span class="num play">▶︎</span>
       </button>`);
     if (completedSet.has(cp.id)) { const s = $('.state', row); s.textContent = '✓'; s.classList.add('done'); }
     else if (visitedSet.has(cp.id)) $('.state', row).textContent = t('visited');
