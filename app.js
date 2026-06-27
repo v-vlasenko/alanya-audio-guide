@@ -57,6 +57,16 @@ function registerSW() {
   }).catch(() => {});
 }
 
+async function hardRefresh() {
+  try {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map((r) => r.unregister()));
+  } catch {}
+  location.reload(true);
+}
+
 /* ---------- network indicator ---------- */
 function initNet() {
   const setNetH = () => {
@@ -104,10 +114,12 @@ function renderHome() {
     </header>
     <section class="tours" id="tours"></section>
     ${standalone ? '' : `<div class="install-hint"><button class="btn ghost" id="install-help">${esc(t('installTitle'))}</button></div>`}
+    <div class="refresh-hint"><button id="hard-refresh">⟳ Скинути кеш</button></div>
   `;
   const wrap = $('#tours');
   INDEX.tours.forEach((tr) => wrap.appendChild(tourCard(tr)));
   if (!standalone) $('#install-help').onclick = showInstallSheet;
+  $('#hard-refresh').onclick = hardRefresh;
 }
 
 function tourCard(tr) {

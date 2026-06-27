@@ -152,6 +152,8 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
   background:#4a1f12; color:#ffd9c2; border:1px solid #7a3b22; border-radius:12px; padding:12px 14px; font-size:15px}
 
 .install-hint{margin-top:18px; text-align:center}
+.refresh-hint{margin-top:24px; text-align:center}
+.refresh-hint button{background:none; border:none; color:var(--muted); font-size:13px; padding:8px 12px; opacity:.6}
 /* ---- completion overlay ---- */
 .completion-overlay{position:fixed; inset:0; z-index:2000; background:rgba(28,20,16,.95);
   display:flex; align-items:center; justify-content:center}
