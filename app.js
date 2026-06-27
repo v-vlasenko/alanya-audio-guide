@@ -108,7 +108,7 @@ function tourCard(tr) {
   const card = el(`
     <article class="tour-card">
       <div class="cover-wrap">
-        <div class="cover">${esc(tr.title)}</div>
+        <div class="cover"></div>
       </div>
       <div class="tour-body">
         <h2>${esc(tr.title)}</h2>
