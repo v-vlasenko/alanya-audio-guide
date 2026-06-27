@@ -112,6 +112,10 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .pin.optional{background:#caa15a}
 .me-dot{width:18px; height:18px; border-radius:50%; background:#2b8cff; border:3px solid #fff;
   box-shadow:0 0 0 6px rgba(43,140,255,.25)}
+.wp-pin{width:28px; height:28px; border-radius:50% 50% 50% 0; background:#4a9eff; color:#fff;
+  border:2px solid #fff; display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:800; box-shadow:0 2px 5px rgba(0,0,0,.5); transform:rotate(-45deg)}
+.wp-pin>*{transform:rotate(45deg)}
 
 /* ---- player ---- */
 .player{
@@ -153,3 +157,9 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .toast{position:fixed; left:50%; bottom:calc(var(--safe-b) + 90px); transform:translateX(-50%);
   background:#000; color:#fff; padding:10px 16px; border-radius:20px; z-index:1400; font-size:15px; opacity:.95}
 [hidden]{display:none!important}
+.player.info-only .seek,
+.player.info-only .p-speed-row,
+.player.info-only #p-play{display:none}
+/* Leaflet popup dark theme */
+.leaflet-popup-content-wrapper{background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:12px}
+.leaflet-popup-tip{background:var(--card)}

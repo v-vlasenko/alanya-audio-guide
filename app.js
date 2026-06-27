@@ -378,6 +378,15 @@ async function renderMap() {
     pts.push([cp.lat, cp.lng]);
   });
 
+  // info-only waypoints (no audio, map popup only)
+  (activeTour.waypoints || []).forEach((wp) => {
+    const icon = L.divIcon({ className: '', html: '<div class="wp-pin">ℹ</div>', iconSize: [28, 28], iconAnchor: [14, 28] });
+    L.marker([wp.lat, wp.lng], { icon }).addTo(map)
+      .bindPopup(`<b>${wp.title}</b><br><span style="font-size:13px">${wp.description}</span>`, { maxWidth: 220 })
+      .on('click', () => haptic());
+    pts.push([wp.lat, wp.lng]);
+  });
+
   if (bbox) map.fitBounds([[bbox.s, bbox.w], [bbox.n, bbox.e]]);
   else if (pts.length) map.fitBounds(pts, { padding: [30, 30] });
   setTimeout(() => map.invalidateSize(), 60);
@@ -469,8 +478,15 @@ function playIndex(i) {
   const cp = ordered()[i];
   if (!cp) return;
   curIdx = i;
-  audio.src = activeTour.basePath + cp.audio;
-  audio.playbackRate = playSpeed;
+  const hasAudio = !!cp.audio;
+  if (hasAudio) {
+    audio.src = activeTour.basePath + cp.audio;
+    audio.playbackRate = playSpeed;
+  } else {
+    audio.pause();
+    audio.removeAttribute('src');
+  }
+  $('#player').classList.toggle('info-only', !hasAudio);
   saveProgress(activeTour.id, i);
   $('#p-title').textContent = `${cp.order}. ${cp.shortTitle || cp.title}`;
   $('#p-transcript').textContent = cp.transcript || '';

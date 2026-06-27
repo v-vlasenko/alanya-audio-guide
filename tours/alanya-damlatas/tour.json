@@ -16,6 +16,15 @@
   "tip": "Починається на пляжі Клеопатри і завершується біля музею. Звідси канатна дорога веде нагору до фортеці.",
   "_coordsWarning": "ALL lat/lng are ROUGH, UNVERIFIED placeholders. Replace with measured coordinates (Google Maps: right-click -> copy) before relying on geofencing; then set coordsVerified=true. Manual playback works regardless.",
   "audioPathNote": "Full path = basePath + audio.",
+  "waypoints": [
+    {
+      "id": "cableway-lower",
+      "title": "Канатна дорога → Фортеця",
+      "description": "Нижня станція телеферику. ~5 хв їзди до входу у фортецю (зупинка 1 туру «Аланійська фортеця»). Квиток ~3–5 € в одну сторону.",
+      "lat": 36.5415,
+      "lng": 31.9891
+    }
+  ],
   "checkpoints": [
     {
       "id": "01-cleopatra",
