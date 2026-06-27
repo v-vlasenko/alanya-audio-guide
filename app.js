@@ -309,16 +309,12 @@ function teardownMap() {
 async function renderMap() {
   if (map) { setTimeout(() => map.invalidateSize(), 50); return; }
   const pane = $('#pane-map');
-  const gpsOff = localStorage.getItem('gpsOff') === '1';
   pane.innerHTML = `
     <div class="map-wrap">
       <div id="map"></div>
       <button class="recenter" id="recenter" title="${esc(t('gpsToggleLabel'))}">◎</button>
       <button class="layer-btn" id="layer-btn" title="Супутниковий вигляд">🛰</button>
-    </div>
-    <button class="btn ghost sm" id="gps-toggle" style="margin-top:12px">
-      ${esc(gpsOff ? t('gpsOff') : t('gpsOn'))}
-    </button>`;
+    </div>`;
 
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
   const base = activeTour.basePath;
@@ -392,12 +388,7 @@ async function renderMap() {
   setTimeout(() => map.invalidateSize(), 60);
 
   $('#recenter').onclick = () => { if (meLayer) map.panTo(meLayer.getLatLng()); };
-  $('#gps-toggle').onclick = () => {
-    const off = localStorage.getItem('gpsOff') === '1';
-    localStorage.setItem('gpsOff', off ? '0' : '1');
-    teardownMap(); renderMap();
-  };
-  if (!gpsOff) startWatch();
+  startWatch();
 }
 
 function startWatch() {
