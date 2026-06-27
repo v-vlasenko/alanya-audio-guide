@@ -5,6 +5,18 @@
   "language": "uk",
   "tours": [
     {
+      "id": "alanya-damlatas",
+      "title": "Дамлаташ і Клеопатра",
+      "subtitle": "Пляж Клеопатри, печера та археологічний музей",
+      "region": "Аланія, Туреччина",
+      "path": "tours/alanya-damlatas/tour.json",
+      "cover": "tours/alanya-damlatas/cover.jpg",
+      "checkpointCount": 3,
+      "durationMin": 40,
+      "approxSizeMb": 5,
+      "version": "1.1"
+    },
+    {
       "id": "alanya-castle",
       "title": "Аланійська фортеця",
       "subtitle": "Аудіотур фортецею сельджуків",
@@ -28,18 +40,6 @@
       "approxSizeMb": 7,
       "bestTime": "Найкраще надвечір, гарний захід сонця",
       "version": "1.2"
-    },
-    {
-      "id": "alanya-damlatas",
-      "title": "Дамлаташ і Клеопатра",
-      "subtitle": "Пляж Клеопатри, печера та археологічний музей",
-      "region": "Аланія, Туреччина",
-      "path": "tours/alanya-damlatas/tour.json",
-      "cover": "tours/alanya-damlatas/cover.jpg",
-      "checkpointCount": 3,
-      "durationMin": 40,
-      "approxSizeMb": 5,
-      "version": "1.1"
     }
   ]
 }

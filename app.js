@@ -327,10 +327,11 @@ async function renderMap() {
 
   map = L.map('map', { zoomControl: true, attributionControl: true, doubleClickZoom: true });
 
-  // Hybrid layer: serves local offline tiles first; falls back to Esri online for
-  // tiles outside the pre-downloaded bbox (so the map looks complete when online).
-  const ESRI_STREET = (c) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${c.z}/${c.y}/${c.x}`;
-  const ESRI_SAT    = (c) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${c.z}/${c.y}/${c.x}`;
+  // Street layer: local offline tiles first, Esri street fallback for tiles outside bbox.
+  // Satellite layer: pure online Esri — local tiles are street map, mixing them causes a
+  // jarring split between street-map center and satellite surroundings.
+  const ESRI_STREET_URL = (c) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${c.z}/${c.y}/${c.x}`;
+  const ESRI_SAT_TMPL   = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 
   function makeHybrid(basePath, fallbackUrl) {
     return L.TileLayer.extend({
@@ -348,8 +349,7 @@ async function renderMap() {
     });
   }
 
-  const HybridStreet = makeHybrid(base, ESRI_STREET);
-  const HybridSat    = makeHybrid(base, ESRI_SAT);
+  const HybridStreet = makeHybrid(base, ESRI_STREET_URL);
 
   let isSat = false;
   let curLayer = new HybridStreet('', { minZoom: 14, maxZoom: 18, attribution: 'Tiles © Esri' }).addTo(map);
@@ -358,7 +358,7 @@ async function renderMap() {
     isSat = !isSat;
     map.removeLayer(curLayer);
     if (isSat) {
-      curLayer = new HybridSat('', { minZoom: 14, maxZoom: 18, attribution: 'Tiles © Esri, Maxar' }).addTo(map);
+      curLayer = L.tileLayer(ESRI_SAT_TMPL, { minZoom: 14, maxZoom: 18, attribution: 'Tiles © Esri, Maxar' }).addTo(map);
       $('#layer-btn').textContent = '🗺';
       $('#layer-btn').title = 'Звичайний вигляд';
     } else {
