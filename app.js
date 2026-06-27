@@ -58,12 +58,17 @@ function registerSW() {
 
 /* ---------- network indicator ---------- */
 function initNet() {
+  const setNetH = () => {
+    const h = netEl.hidden ? 0 : netEl.getBoundingClientRect().height;
+    document.documentElement.style.setProperty('--net-h', h + 'px');
+  };
   const upd = () => {
     if (navigator.onLine) {
       netEl.className = 'net on'; netEl.textContent = t('onlineIndicator'); netEl.hidden = true;
     } else {
       netEl.className = 'net off'; netEl.textContent = t('offlineIndicator'); netEl.hidden = false;
     }
+    requestAnimationFrame(setNetH);
   };
   window.addEventListener('online', upd);
   window.addEventListener('offline', upd);
