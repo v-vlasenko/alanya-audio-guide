@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <title>Аудіогіди Аланії</title>
+  <meta name="description" content="Офлайн аудіогіди Аланії українською">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#c75b39">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Аудіогіди">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="lib/leaflet.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <!-- offline / online indicator -->
+  <div id="net" class="net" hidden></div>
+
+  <!-- in-app-browser (Telegram/WhatsApp) -> open in Safari warning -->
+  <div id="webview-warn" class="webview-warn" hidden></div>
+
+  <!-- screens are rendered into #app by app.js -->
+  <main id="app" aria-live="polite"></main>
+
+  <script src="lib/leaflet.js"></script>
+  <script src="app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,462 @@
+/* Аудіогіди Аланії — offline-first multi-tour audio guide (vanilla, no build).
+   v1: tour picker, per-tour offline download, manual list+map playback,
+   live "you are here" dot (position only). Geofence auto-prompt = v2. */
+'use strict';
+
+const SHELL_VERSION = 'v1';
+const $ = (sel, el = document) => el.querySelector(sel);
+const app = $('#app');
+const netEl = $('#net');
+
+let STR = {};                 // ui strings
+let INDEX = null;             // tour catalog
+const tourCache = new Map();  // id -> loaded tour.json
+
+/* ---------- tiny helpers ---------- */
+const t = (k) => STR[k] ?? k;
+const el = (html) => { const d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; };
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const cacheName = (id, version) => `tour-${id}-${version}`;
+const fmtTime = (s) => { s = Math.floor(s || 0); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+
+/* slippy-tile math (mirrors scripts/fetch-tiles.mjs) */
+const lon2x = (lon, z) => Math.floor(((lon + 180) / 360) * 2 ** z);
+const lat2y = (lat, z) => {
+  const r = (lat * Math.PI) / 180;
+  return Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * 2 ** z);
+};
+
+/* ---------- boot ---------- */
+async function boot() {
+  try {
+    [STR, INDEX] = await Promise.all([
+      fetch('data/ui-strings-uk.json').then((r) => r.json()),
+      fetch('tours/index.json').then((r) => r.json()),
+    ]);
+  } catch (e) {
+    app.innerHTML = '<p>Не вдалося завантажити дані. Перевірте з\'єднання та оновіть сторінку.</p>';
+    return;
+  }
+  document.title = INDEX.appName || document.title;
+  initNet();
+  detectWebview();
+  registerSW();
+  window.addEventListener('hashchange', route);
+  route();
+}
+
+/* ---------- service worker + offline heal ---------- */
+function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('sw.js').then((reg) => {
+    // re-cache shell on every launch (defensive heal vs iOS eviction)
+    const heal = () => navigator.serviceWorker.controller?.postMessage({ type: 'heal' });
+    if (navigator.serviceWorker.controller) heal();
+    else navigator.serviceWorker.addEventListener('controllerchange', heal, { once: true });
+  }).catch(() => {});
+}
+
+/* ---------- network indicator ---------- */
+function initNet() {
+  const upd = () => {
+    if (navigator.onLine) {
+      netEl.className = 'net on'; netEl.textContent = t('onlineIndicator'); netEl.hidden = true;
+    } else {
+      netEl.className = 'net off'; netEl.textContent = t('offlineIndicator'); netEl.hidden = false;
+    }
+  };
+  window.addEventListener('online', upd);
+  window.addEventListener('offline', upd);
+  upd();
+}
+
+/* detect in-app browser webviews (Telegram/Instagram/etc.) where A2HS is unavailable */
+function detectWebview() {
+  const ua = navigator.userAgent || '';
+  const inApp = /(FBAN|FBAV|Instagram|Telegram|Line|WhatsApp|MicroMessenger)/i.test(ua);
+  const isStandalone = window.navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  if (inApp && !isStandalone) {
+    const w = $('#webview-warn'); w.textContent = t('openInSafariWarning'); w.hidden = false;
+  }
+}
+
+/* ---------- router ---------- */
+function route() {
+  stopPlayer();
+  teardownMap();
+  const m = location.hash.match(/^#\/tour\/([\w-]+)/);
+  if (m) renderTour(m[1]); else renderHome();
+}
+
+/* ================= HOME / PICKER ================= */
+function renderHome() {
+  const standalone = window.navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  app.innerHTML = `
+    <header class="home-head">
+      <h1>${esc(t('toursTitle'))}</h1>
+      <p class="muted">${esc(t('toursSubtitle'))}</p>
+    </header>
+    <section class="tours" id="tours"></section>
+    ${standalone ? '' : `<div class="install-hint"><button class="btn ghost" id="install-help">${esc(t('installTitle'))}</button></div>`}
+  `;
+  const wrap = $('#tours');
+  INDEX.tours.forEach((tr) => wrap.appendChild(tourCard(tr)));
+  if (!standalone) $('#install-help').onclick = showInstallSheet;
+}
+
+function tourCard(tr) {
+  const card = el(`
+    <article class="tour-card">
+      <div class="cover-wrap">
+        <div class="cover">${esc(tr.title)}</div>
+      </div>
+      <div class="tour-body">
+        <h2>${esc(tr.title)}</h2>
+        <p class="muted">${esc(tr.subtitle || '')}</p>
+        ${tr.bestTime ? `<p class="best-time">⏰ ${esc(tr.bestTime)}</p>` : ''}
+        <div class="meta-row">
+          <span>${esc(t('tourCheckpointsLabel'))}: <b>${tr.checkpointCount}</b></span>
+          <span>${esc(t('tourDurationLabel'))}: <b>${tr.durationMin}</b> ${esc(t('minutesShort'))}</span>
+          <span>${esc(t('tourSizeLabel'))}: <b>${tr.approxSizeMb}</b> ${esc(t('megabytesShort'))}</span>
+        </div>
+        <div class="card-actions">
+          <button class="btn open">${esc(t('openTour'))}</button>
+          <button class="btn secondary dl">${esc(t('downloadTour'))}</button>
+        </div>
+        <div class="dl-state muted"></div>
+      </div>
+    </article>`);
+
+  // cover image with graceful fallback to the gradient+title card
+  const img = new Image();
+  img.src = `${tr.cover}`;
+  img.alt = tr.title;
+  img.onload = () => { $('.cover', card).replaceWith(img); };
+
+  $('.open', card).onclick = () => { location.hash = `#/tour/${tr.id}`; };
+  wireDownload(tr, card);
+  return card;
+}
+
+/* ---- per-tour offline download ---- */
+async function wireDownload(tr, card) {
+  const btn = $('.dl', card);
+  const state = $('.dl-state', card);
+  const cn = cacheName(tr.id, tr.version);
+
+  async function isDownloaded() {
+    if (!('caches' in window)) return false;
+    const c = await caches.open(cn);
+    return !!(await c.match(tr.path));
+  }
+  function setDone() {
+    btn.textContent = t('tourDownloaded'); btn.classList.add('good'); btn.classList.remove('secondary');
+    btn.disabled = true;
+    state.innerHTML = `<button class="btn ghost sm del">${esc(t('deleteTourDownload'))}</button>`;
+    $('.del', state).onclick = async () => { await caches.delete(cn); refresh(); };
+  }
+  function setIdle() {
+    btn.textContent = t('downloadTour'); btn.disabled = false;
+    btn.classList.add('secondary'); btn.classList.remove('good');
+    state.innerHTML = `<span class="muted">${esc(t('notDownloadedHint'))}</span>`;
+  }
+  async function refresh() { (await isDownloaded()) ? setDone() : setIdle(); }
+
+  btn.onclick = async () => {
+    if (!('caches' in window)) return;
+    btn.disabled = true; btn.textContent = t('downloadingTour');
+    state.innerHTML = `<div class="dl-bar"><i></i></div>`;
+    const bar = $('.dl-bar > i', state);
+    try {
+      const urls = await tourAssetUrls(tr);
+      const cache = await caches.open(cn);
+      let done = 0;
+      for (const u of urls) {
+        try {
+          const res = await fetch(u, { cache: 'reload' });
+          if (res.ok) await cache.put(u, res.clone());
+        } catch { /* cover may 404 (placeholder) — ignore */ }
+        done++; bar.style.width = `${Math.round((done / urls.length) * 100)}%`;
+      }
+      setDone();
+    } catch (e) {
+      btn.disabled = false; btn.textContent = t('downloadTour');
+      state.innerHTML = `<span class="muted">⚠︎ ${esc(t('errorAudioBody'))}</span>`;
+    }
+  };
+  refresh();
+}
+
+/* full asset list for a tour: tour.json + audio + cover + all map tiles */
+async function tourAssetUrls(tr) {
+  const tour = await loadTour(tr.id);
+  const base = tour.basePath;
+  const urls = [tr.path, tr.cover];
+  tour.checkpoints.forEach((c) => urls.push(base + c.audio));
+  // tiles
+  try {
+    const meta = await fetch(`${base}tiles/meta.json`).then((r) => r.json());
+    const { bbox, zoomMin, zoomMax } = meta;
+    for (let z = zoomMin; z <= zoomMax; z++) {
+      const x0 = lon2x(bbox.w, z), x1 = lon2x(bbox.e, z);
+      const y0 = lat2y(bbox.n, z), y1 = lat2y(bbox.s, z);
+      for (let x = x0; x <= x1; x++)
+        for (let y = y0; y <= y1; y++) urls.push(`${base}tiles/${z}/${x}/${y}.png`);
+    }
+    urls.push(`${base}tiles/meta.json`);
+  } catch { /* no tiles yet */ }
+  return [...new Set(urls)];
+}
+
+/* ================= TOUR VIEW ================= */
+let activeTour = null;
+let visitedSet = new Set();
+
+async function loadTour(id) {
+  if (tourCache.has(id)) return tourCache.get(id);
+  const tr = INDEX.tours.find((x) => x.id === id);
+  const tour = await fetch(tr.path).then((r) => r.json());
+  tourCache.set(id, tour);
+  return tour;
+}
+
+async function renderTour(id) {
+  const meta = INDEX.tours.find((x) => x.id === id);
+  if (!meta) { location.hash = '#/'; return; }
+  let tour;
+  try { tour = await loadTour(id); }
+  catch { app.innerHTML = `<p>${esc(t('notDownloadedHint'))}</p><button class="btn" onclick="location.hash='#/'">${esc(t('backToTours'))}</button>`; return; }
+  activeTour = tour;
+  visitedSet = loadVisited(id);
+
+  app.innerHTML = `
+    <div class="topbar">
+      <button class="btn ghost sm" id="back">${esc(t('backToTours'))}</button>
+      <h2>${esc(tour.title)}</h2>
+    </div>
+    ${tour.tip ? `<div class="tip">💡 ${esc(tour.tip)}</div>` : ''}
+    <button class="btn" id="start">${esc(t('startTour'))}</button>
+    <div class="tabs" role="tablist">
+      <button id="tab-list" role="tab" aria-selected="true">${esc(t('tabList'))}</button>
+      <button id="tab-map" role="tab" aria-selected="false">${esc(t('tabMap'))}</button>
+    </div>
+    <section id="pane-list"></section>
+    <section id="pane-map" hidden></section>
+    <div class="player" id="player"></div>
+  `;
+  $('#back').onclick = () => { location.hash = '#/'; };
+  $('#start').onclick = () => { playIndex(0); };
+  $('#tab-list').onclick = () => switchTab('list');
+  $('#tab-map').onclick = () => switchTab('map');
+  buildPlayer();
+  renderList();
+}
+
+function switchTab(which) {
+  const isMap = which === 'map';
+  $('#tab-list').setAttribute('aria-selected', String(!isMap));
+  $('#tab-map').setAttribute('aria-selected', String(isMap));
+  $('#pane-list').hidden = isMap;
+  $('#pane-map').hidden = !isMap;
+  if (isMap) renderMap();
+}
+
+function renderList() {
+  const pane = $('#pane-list');
+  pane.innerHTML = '<div class="cp-list"></div>';
+  const list = $('.cp-list', pane);
+  activeTour.checkpoints.slice().sort((a, b) => a.order - b.order).forEach((cp, i) => {
+    const row = el(`
+      <button class="cp" data-i="${i}">
+        <span class="num">${cp.order}</span>
+        <span class="t">
+          <b>${esc(cp.shortTitle || cp.title)}</b>
+          ${cp.optional ? `<span class="badge">${esc(t('optionalBadge'))}</span>` : ''}
+          <span class="state"></span>
+        </span>
+        <span class="num play">▶︎</span>
+      </button>`);
+    if (visitedSet.has(cp.id)) $('.state', row).textContent = t('visited');
+    row.onclick = () => playIndex(i);
+    list.appendChild(row);
+  });
+}
+
+/* ================= MAP (Leaflet + bundled tiles + live dot) ================= */
+let map = null, meLayer = null, watchId = null, didFit = false;
+
+function teardownMap() {
+  if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  if (map) { map.remove(); map = null; }
+  meLayer = null; didFit = false;
+}
+
+async function renderMap() {
+  if (map) { setTimeout(() => map.invalidateSize(), 50); return; }
+  const pane = $('#pane-map');
+  const gpsOff = localStorage.getItem('gpsOff') === '1';
+  pane.innerHTML = `
+    <div class="map-wrap">
+      <div id="map"></div>
+      <button class="recenter" id="recenter" title="${esc(t('gpsToggleLabel'))}">◎</button>
+    </div>
+    <button class="btn ghost sm" id="gps-toggle" style="margin-top:12px">
+      ${esc(gpsOff ? t('gpsOff') : t('gpsOn'))}
+    </button>`;
+
+  const base = activeTour.basePath;
+  let bbox = null;
+  try { bbox = (await fetch(`${base}tiles/meta.json`).then((r) => r.json())).bbox; } catch {}
+
+  map = L.map('map', { zoomControl: true, attributionControl: true });
+  L.tileLayer(`${base}tiles/{z}/{x}/{y}.png`, {
+    minZoom: 14, maxZoom: 18,
+    attribution: 'Tiles © Esri',
+    errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=',
+  }).addTo(map);
+
+  // numbered markers
+  const pts = [];
+  activeTour.checkpoints.forEach((cp) => {
+    const cls = cp.optional ? 'pin optional' : 'pin';
+    const icon = L.divIcon({ className: '', html: `<div class="${cls}"><span>${cp.order}</span></div>`, iconSize: [30, 30], iconAnchor: [15, 30] });
+    const mk = L.marker([cp.lat, cp.lng], { icon }).addTo(map);
+    mk.on('click', () => playById(cp.id));
+    pts.push([cp.lat, cp.lng]);
+  });
+
+  if (bbox) map.fitBounds([[bbox.s, bbox.w], [bbox.n, bbox.e]]);
+  else if (pts.length) map.fitBounds(pts, { padding: [30, 30] });
+  setTimeout(() => map.invalidateSize(), 60);
+
+  $('#recenter').onclick = () => { if (meLayer) map.panTo(meLayer.getLatLng()); };
+  $('#gps-toggle').onclick = () => {
+    const off = localStorage.getItem('gpsOff') === '1';
+    localStorage.setItem('gpsOff', off ? '0' : '1');
+    teardownMap(); renderMap();
+  };
+  if (!gpsOff) startWatch();
+}
+
+function startWatch() {
+  if (!('geolocation' in navigator)) return;
+  watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const ll = [pos.coords.latitude, pos.coords.longitude];
+      if (!meLayer) {
+        meLayer = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(map);
+        if (!didFit) { map.setView(ll, 17); didFit = true; }
+      } else meLayer.setLatLng(ll);
+    },
+    () => {},                                   // denied/err: map still works, no dot
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+  );
+}
+
+/* ================= PLAYER ================= */
+let audio = null, curIdx = -1;
+
+function buildPlayer() {
+  const p = $('#player');
+  p.innerHTML = `
+    <div class="pt"><span id="p-title"></span><button class="close" id="p-close">✕</button></div>
+    <div class="seek">
+      <span id="p-cur">0:00</span>
+      <input type="range" id="p-seek" min="0" max="100" value="0" step="1">
+      <span id="p-dur">0:00</span>
+    </div>
+    <div class="pcontrols">
+      <button class="btn secondary" id="p-prev">${esc(t('previous'))}</button>
+      <button class="btn" id="p-play">${esc(t('pause'))}</button>
+      <button class="btn secondary" id="p-next">${esc(t('next'))}</button>
+    </div>
+    <div class="transcript" id="p-transcript"></div>
+  `;
+  audio = new Audio();
+  audio.preload = 'metadata';
+  audio.addEventListener('loadedmetadata', () => { $('#p-dur').textContent = fmtTime(audio.duration); $('#p-seek').max = Math.floor(audio.duration) || 100; });
+  audio.addEventListener('timeupdate', () => {
+    const cur = $('#p-cur'); if (!cur) return;
+    cur.textContent = fmtTime(audio.currentTime);
+    if (!seeking) $('#p-seek').value = Math.floor(audio.currentTime);
+  });
+  audio.addEventListener('play', () => { const b = $('#p-play'); if (b) b.textContent = t('pause'); markPlaying(true); });
+  audio.addEventListener('pause', () => { const b = $('#p-play'); if (b) b.textContent = t('play'); markPlaying(false); });
+  audio.addEventListener('ended', () => { if (activeTour && curIdx < activeTour.checkpoints.length - 1) playIndex(curIdx + 1); });
+  audio.addEventListener('error', () => { toast(t('errorAudioBody')); });
+
+  let seeking = false;
+  const seek = $('#p-seek');
+  seek.addEventListener('input', () => { seeking = true; $('#p-cur').textContent = fmtTime(seek.value); });
+  seek.addEventListener('change', () => { audio.currentTime = Number(seek.value); seeking = false; });
+  $('#p-play').onclick = () => { audio.paused ? audio.play() : audio.pause(); };
+  $('#p-prev').onclick = () => { if (curIdx > 0) playIndex(curIdx - 1); };
+  $('#p-next').onclick = () => { if (curIdx < activeTour.checkpoints.length - 1) playIndex(curIdx + 1); };
+  $('#p-close').onclick = stopPlayer;
+}
+
+const ordered = () => activeTour.checkpoints.slice().sort((a, b) => a.order - b.order);
+
+function playIndex(i) {
+  const cp = ordered()[i];
+  if (!cp) return;
+  curIdx = i;
+  audio.src = activeTour.basePath + cp.audio;
+  $('#p-title').textContent = `${cp.order}. ${cp.shortTitle || cp.title}`;
+  $('#p-transcript').textContent = cp.transcript || '';
+  $('#p-transcript').scrollTop = 0;
+  $('#player').classList.add('open');
+  audio.play().catch(() => toast(t('errorAudioBody')));
+  markVisited(cp.id);
+}
+function playById(id) { const i = ordered().findIndex((c) => c.id === id); if (i >= 0) { switchTab('list'); playIndex(i); } }
+
+function markPlaying(on) {
+  document.querySelectorAll('.cp').forEach((r) => r.classList.remove('playing'));
+  if (on && curIdx >= 0) document.querySelector(`.cp[data-i="${curIdx}"]`)?.classList.add('playing');
+}
+function stopPlayer() {
+  if (audio) { audio.pause(); audio.removeAttribute('src'); }
+  curIdx = -1;
+  $('#player')?.classList.remove('open');
+}
+
+/* visited persistence */
+function loadVisited(id) { try { return new Set(JSON.parse(localStorage.getItem('visited-' + id) || '[]')); } catch { return new Set(); } }
+function markVisited(cpId) {
+  if (!activeTour) return;
+  visitedSet.add(cpId);
+  localStorage.setItem('visited-' + activeTour.id, JSON.stringify([...visitedSet]));
+  const i = ordered().findIndex((c) => c.id === cpId);
+  const row = document.querySelector(`.cp[data-i="${i}"] .state`);
+  if (row) row.textContent = t('visited');
+}
+
+/* ---------- install sheet ---------- */
+function showInstallSheet() {
+  const sheet = el(`
+    <div class="sheet-backdrop" id="sheet-bd">
+      <div class="sheet">
+        <h2>${esc(t('installTitle'))}</h2>
+        <ol>
+          <li>${esc(t('installStep1'))}</li>
+          <li>${esc(t('installStep2'))}</li>
+          <li>${esc(t('installStep3'))}</li>
+          <li>${esc(t('installStep4'))}</li>
+        </ol>
+        <button class="btn" id="sheet-close">${esc(t('close'))}</button>
+      </div>
+    </div>`);
+  document.body.appendChild(sheet);
+  const close = () => sheet.remove();
+  $('#sheet-close', sheet).onclick = close;
+  sheet.addEventListener('click', (e) => { if (e.target === sheet) close(); });
+}
+
+function toast(msg) {
+  const tEl = el(`<div class="toast">${esc(msg)}</div>`);
+  document.body.appendChild(tEl);
+  setTimeout(() => tEl.remove(), 2600);
+}
+
+boot();

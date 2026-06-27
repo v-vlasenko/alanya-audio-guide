@@ -1,0 +1,45 @@
+{
+  "_comment": "Tour catalog. The app reads this to render the tour-picker home screen. To ADD a new tour: create tours/<id>/tour.json (+ audio), then add one entry here. No code changes needed. 'path' is from site root.",
+  "appName": "Аудіогіди Аланії",
+  "appVersion": "1.1",
+  "language": "uk",
+  "tours": [
+    {
+      "id": "alanya-castle",
+      "title": "Аланійська фортеця",
+      "subtitle": "Аудіотур фортецею сельджуків",
+      "region": "Аланія, Туреччина",
+      "path": "tours/alanya-castle/tour.json",
+      "cover": "tours/alanya-castle/cover.jpg",
+      "checkpointCount": 9,
+      "durationMin": 60,
+      "approxSizeMb": 12,
+      "version": "1.0"
+    },
+    {
+      "id": "alanya-harbor",
+      "title": "Гавань і старе місто",
+      "subtitle": "Тофане, набережна, захід сонця",
+      "region": "Аланія, Туреччина",
+      "path": "tours/alanya-harbor/tour.json",
+      "cover": "tours/alanya-harbor/cover.jpg",
+      "checkpointCount": 5,
+      "durationMin": 60,
+      "approxSizeMb": 7,
+      "bestTime": "Найкраще надвечір, гарний захід сонця",
+      "version": "1.2"
+    },
+    {
+      "id": "alanya-damlatas",
+      "title": "Дамлаташ і Клеопатра",
+      "subtitle": "Пляж Клеопатри, печера та археологічний музей",
+      "region": "Аланія, Туреччина",
+      "path": "tours/alanya-damlatas/tour.json",
+      "cover": "tours/alanya-damlatas/cover.jpg",
+      "checkpointCount": 3,
+      "durationMin": 40,
+      "approxSizeMb": 5,
+      "version": "1.1"
+    }
+  ]
+}
