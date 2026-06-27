@@ -64,6 +64,9 @@ async function hardRefresh() {
     const regs = await navigator.serviceWorker.getRegistrations();
     await Promise.all(regs.map((r) => r.unregister()));
   } catch {}
+  for (const key of Object.keys(localStorage)) {
+    if (key !== 'gpsOff') localStorage.removeItem(key);
+  }
   location.reload(true);
 }
 
