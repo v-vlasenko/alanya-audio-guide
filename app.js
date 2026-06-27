@@ -116,8 +116,6 @@ function tourCard(tr) {
         ${tr.bestTime ? `<p class="best-time">⏰ ${esc(tr.bestTime)}</p>` : ''}
         <div class="meta-row">
           <span>${esc(t('tourCheckpointsLabel'))}: <b>${tr.checkpointCount}</b></span>
-          <span>${esc(t('tourDurationLabel'))}: <b>${tr.durationMin}</b> ${esc(t('minutesShort'))}</span>
-          <span>${esc(t('tourSizeLabel'))}: <b>${tr.approxSizeMb}</b> ${esc(t('megabytesShort'))}</span>
         </div>
         <div class="card-actions">
           <button class="btn secondary dl">${esc(t('downloadTour'))}</button>
@@ -158,7 +156,7 @@ async function wireDownload(tr, card) {
   function setIdle() {
     btn.textContent = t('downloadTour'); btn.disabled = false;
     btn.classList.add('secondary'); btn.classList.remove('good');
-    state.innerHTML = `<span class="muted">${esc(t('notDownloadedHint'))}</span>`;
+    state.innerHTML = '';
   }
   async function refresh() { (await isDownloaded()) ? setDone() : setIdle(); }
 
@@ -300,21 +298,46 @@ async function renderMap() {
     <div class="map-wrap">
       <div id="map"></div>
       <button class="recenter" id="recenter" title="${esc(t('gpsToggleLabel'))}">◎</button>
+      <button class="layer-btn" id="layer-btn" title="Супутниковий вигляд">🛰</button>
     </div>
     <button class="btn ghost sm" id="gps-toggle" style="margin-top:12px">
       ${esc(gpsOff ? t('gpsOff') : t('gpsOn'))}
     </button>`;
 
+  const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
   const base = activeTour.basePath;
   let bbox = null;
   try { bbox = (await fetch(`${base}tiles/meta.json`).then((r) => r.json())).bbox; } catch {}
 
   map = L.map('map', { zoomControl: true, attributionControl: true });
-  L.tileLayer(`${base}tiles/{z}/{x}/{y}.png`, {
-    minZoom: 14, maxZoom: 18,
-    attribution: 'Tiles © Esri, Maxar',
-    errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=',
+
+  // custom tile layer subclass for Esri satellite (URL order: z/y/x, not z/x/y)
+  const EsriSat = L.TileLayer.extend({
+    getTileUrl(c) {
+      return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${c.z}/${c.y}/${c.x}`;
+    }
+  });
+
+  let isSat = false;
+  let curLayer = L.tileLayer(`${base}tiles/{z}/{x}/{y}.png`, {
+    minZoom: 14, maxZoom: 18, attribution: 'Tiles © Esri', errorTileUrl: BLANK,
   }).addTo(map);
+
+  $('#layer-btn').onclick = () => {
+    isSat = !isSat;
+    map.removeLayer(curLayer);
+    if (isSat) {
+      curLayer = new EsriSat('', { attribution: 'Tiles © Esri, Maxar', errorTileUrl: BLANK }).addTo(map);
+      $('#layer-btn').textContent = '🗺';
+      $('#layer-btn').title = 'Звичайний вигляд';
+    } else {
+      curLayer = L.tileLayer(`${base}tiles/{z}/{x}/{y}.png`, {
+        minZoom: 14, maxZoom: 18, attribution: 'Tiles © Esri', errorTileUrl: BLANK,
+      }).addTo(map);
+      $('#layer-btn').textContent = '🛰';
+      $('#layer-btn').title = 'Супутниковий вигляд';
+    }
+  };
 
   // numbered markers
   const pts = [];
