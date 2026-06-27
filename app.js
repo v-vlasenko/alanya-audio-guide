@@ -328,6 +328,7 @@ async function renderMap() {
       <button class="recenter" id="recenter" title="${esc(t('gpsToggleLabel'))}">◎</button>
       <button class="layer-btn" id="layer-btn" title="Супутниковий вигляд">🛰</button>
       <button class="wp-btn" id="wp-toggle" title="Показати/сховати точки інтересу">ℹ</button>
+      <button class="gps-btn" id="gps-btn" title="GPS геопозиція">📍</button>
     </div>`;
 
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
@@ -414,7 +415,23 @@ async function renderMap() {
   setTimeout(() => map.invalidateSize(), 60);
 
   $('#recenter').onclick = () => { if (meLayer) map.panTo(meLayer.getLatLng()); };
-  startWatch();
+
+  const gpsOff = localStorage.getItem('gpsOff') === '1';
+  const gpsBtn = $('#gps-btn');
+  gpsBtn.classList.toggle('off', gpsOff);
+  gpsBtn.onclick = () => {
+    const nowOff = localStorage.getItem('gpsOff') !== '1';
+    localStorage.setItem('gpsOff', nowOff ? '1' : '0');
+    gpsBtn.classList.toggle('off', nowOff);
+    haptic(8);
+    if (nowOff) {
+      if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+      if (meLayer) { map.removeLayer(meLayer); meLayer = null; }
+    } else {
+      startWatch();
+    }
+  };
+  if (!gpsOff) startWatch();
 }
 
 function startWatch() {
