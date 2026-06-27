@@ -480,6 +480,10 @@ function buildPlayer() {
     const cur = $('#p-cur'); if (!cur) return;
     cur.textContent = fmtTime(audio.currentTime);
     if (!seeking) $('#p-seek').value = Math.floor(audio.currentTime);
+    if (audio.duration > 0 && audio.currentTime / audio.duration >= 0.5) {
+      const cp = ordered()[curIdx];
+      if (cp) markVisited(cp.id);
+    }
   });
   audio.addEventListener('play', () => { const b = $('#p-play'); if (b) b.textContent = t('pause'); markPlaying(true); });
   audio.addEventListener('pause', () => { const b = $('#p-play'); if (b) b.textContent = t('play'); markPlaying(false); });
@@ -529,7 +533,6 @@ function playIndex(i) {
   $('#p-transcript').textContent = cp.transcript || '';
   $('#p-transcript').scrollTop = 0;
   $('#player').classList.add('open');
-  markVisited(cp.id);
 }
 function playById(id) { const i = ordered().findIndex((c) => c.id === id); if (i >= 0) playIndex(i); }
 
@@ -546,7 +549,7 @@ function stopPlayer() {
 /* visited persistence */
 function loadVisited(id) { try { return new Set(JSON.parse(localStorage.getItem('visited-' + id) || '[]')); } catch { return new Set(); } }
 function markVisited(cpId) {
-  if (!activeTour) return;
+  if (!activeTour || visitedSet.has(cpId)) return;
   visitedSet.add(cpId);
   localStorage.setItem('visited-' + activeTour.id, JSON.stringify([...visitedSet]));
   const i = ordered().findIndex((c) => c.id === cpId);
