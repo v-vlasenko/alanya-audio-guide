@@ -76,14 +76,18 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 
 /* ---- tour view ---- */
 .tour-header{margin-bottom:10px}
-.topbar{
-  display:flex; align-items:center; gap:10px;
-  padding:4px 0 10px;
+.tour-back-bar{
+  position:sticky; top:var(--net-h,0px); z-index:50;
+  margin:0 calc(-1 * var(--pad)); padding:6px var(--pad) 10px;
+  background:var(--bg); box-shadow:0 1px 0 var(--line);
 }
-.topbar .btn{flex-shrink:0}
-.topbar h2{
-  flex:1; min-width:0; font-size:18px; margin:0;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+.tour-back{
+  width:auto; min-height:44px; padding:0 14px;
+  border-radius:999px; font-size:15px; font-weight:600;
+  background:var(--card);
+}
+.tour-title{
+  font-size:22px; margin:0 0 12px; line-height:1.2;
 }
 .tabs{display:flex; gap:8px; margin:0 0 10px}
 .tabs button{flex:1; min-height:44px; border-radius:12px; background:var(--card);

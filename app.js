@@ -278,10 +278,10 @@ async function renderTour(id) {
 
   app.innerHTML = `
     <div class="tour-header">
-      <div class="topbar">
-        <button class="btn ghost sm" id="back">${esc(t('backToTours'))}</button>
-        <h2>${esc(tour.title)}</h2>
+      <div class="tour-back-bar">
+        <button class="btn ghost sm tour-back" id="back">${esc(t('backToTours'))}</button>
       </div>
+      <h2 class="tour-title">${esc(tour.title)}</h2>
       <details class="hints-fold">
         <summary>${esc(t('hintsSummary'))}</summary>
         <div class="hints-body">
