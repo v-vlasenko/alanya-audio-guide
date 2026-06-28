@@ -16,6 +16,11 @@
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
+  <script>
+    if (location.protocol === 'file:') {
+      document.body.innerHTML = '<main style="max-width:480px;margin:2rem auto;padding:0 1rem;font:18px/1.5 sans-serif"><h1>Потрібен локальний сервер</h1><p>Після переходу на ES-модулі файл <code>index.html</code> не працює подвійним кліком. Запустіть у папці проєкту:</p><pre style="background:#eee;padding:12px;border-radius:8px">python3 -m http.server 8000</pre><p>Потім відкрийте <a href="http://localhost:8000">http://localhost:8000</a></p></main>';
+    }
+  </script>
   <!-- in-app-browser (Telegram/WhatsApp) -> open in Safari warning -->
   <div id="webview-warn" class="webview-warn" hidden></div>
 
@@ -23,6 +28,6 @@
   <main id="app" aria-live="polite"></main>
 
   <script src="lib/leaflet.js"></script>
-  <script src="app.js" defer></script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>

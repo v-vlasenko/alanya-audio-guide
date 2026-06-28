@@ -66,5 +66,14 @@
   "tourCheckpointsLabel": "Точок",
   "minutesShort": "хв",
   "megabytesShort": "МБ",
-  "notDownloadedHint": "Завантажте маршрут на Wi-Fi перед поїздкою, щоб він працював без інтернету."
+  "notDownloadedHint": "Завантажте маршрут на Wi-Fi перед поїздкою, щоб він працював без інтернету.",
+  "hardRefreshLabel": "⟳ Скинути кеш",
+  "playbackSpeedTitle": "Швидкість відтворення",
+  "mapSatelliteTitle": "Супутниковий вигляд",
+  "mapStreetTitle": "Звичайний вигляд",
+  "mapWaypointsTitle": "Показати/сховати точки інтересу",
+  "mapGpsTitle": "GPS геопозиція",
+  "tourCompletedTitle": "Тур завершено!",
+  "tourCompletedHome": "На головну",
+  "tourCompletedReplay": "Спочатку"
 }

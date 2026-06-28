@@ -44,7 +44,7 @@ To fix: Google Maps → right-click the spot → copy lat,lng → paste into `to
 ## File layout
 
 ```
-index.html · app.js · app.css · sw.js · manifest.json
+index.html · js/main.js · app.css · sw.js · manifest.json
 data/ui-strings-uk.json        UI strings
 lib/leaflet.{js,css}           vendored (no CDN)
 scripts/fetch-tiles.mjs        offline tile downloader
