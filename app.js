@@ -153,6 +153,10 @@ function isPlayerOpen() {
   return !!(p?.classList.contains('open'));
 }
 
+function isPlayerMini() {
+  return $('#player')?.classList.contains('mini') ?? false;
+}
+
 function route() {
   const m = location.hash.match(/^#\/tour\/([\w-]+)/);
   const nextTourId = m?.[1] ?? null;
@@ -163,7 +167,7 @@ function route() {
   promptedSet = new Set();
 
   if (nextTourId) {
-    if (playerOpen && playingTourId && playingTourId !== nextTourId) stopPlayer();
+    if (playerOpen && playingTourId && playingTourId !== nextTourId && !isPlayerMini()) stopPlayer();
     renderTour(nextTourId);
   } else {
     renderHome();
@@ -368,8 +372,12 @@ async function renderTour(id) {
   if (sessionStorage.getItem('expand-player')) {
     sessionStorage.removeItem('expand-player');
     if (isPlayerOpen()) expandPlayer();
-  } else if (curIdx >= 0 && audio && !audio.paused) {
+  } else if (curIdx >= 0 && audio && !audio.paused && playingTourId === id) {
     markPlaying(true);
+  }
+  if (isPlayerOpen()) {
+    syncNavButtons();
+    syncMarkDoneBtn();
   }
 }
 
@@ -771,7 +779,7 @@ function iconUrl(path) {
 function updateMediaSession(cp) {
   if (!('mediaSession' in navigator) || !cp?.audio) return;
   const title = `${cp.order}. ${cp.shortTitle || cp.title}`;
-  const artist = activeTour?.title || INDEX?.appName || '';
+  const artist = getPlayerTour()?.title || INDEX?.appName || '';
   try {
     navigator.mediaSession.metadata = new MediaMetadata({
       title,
@@ -816,7 +824,8 @@ function setupMediaSessionHandlers() {
   safe('pause', () => { haptic(); audio?.pause(); });
   safe('previoustrack', () => { if (curIdx > 0) { haptic(); goTrack(curIdx - 1); } });
   safe('nexttrack', () => {
-    if (activeTour && curIdx < activeTour.checkpoints.length - 1) { haptic(); goTrack(curIdx + 1); }
+    const pt = getPlayerTour();
+    if (pt && curIdx < pt.checkpoints.length - 1) { haptic(); goTrack(curIdx + 1); }
   });
   safe('seekbackward', (d) => { haptic(8); skipAudio(-(d?.seekOffset || SKIP_SEC)); });
   safe('seekforward', (d) => { haptic(8); skipAudio(d?.seekOffset || SKIP_SEC); });
@@ -895,9 +904,10 @@ function buildPlayer() {
   audio.addEventListener('ended', () => {
     maxListenedSec = Math.max(maxListenedSec, audio.duration || 0);
     if (tryMarkCompleted(curIdx)) {
-      const total = audioCheckpointCount(activeTour);
-      if (!isTourFullyCompleted(activeTour.id, total) && curIdx < activeTour.checkpoints.length - 1) {
-        playIndex(curIdx + 1, { autoplay: true });
+      const pt = getPlayerTour();
+      const total = audioCheckpointCount(pt);
+      if (!isTourFullyCompleted(pt.id, total) && curIdx < pt.checkpoints.length - 1) {
+        playIndex(curIdx + 1, { autoplay: true, tour: pt });
       }
     } else if (lastPos) {
       checkProximity(lastPos.lat, lastPos.lng);
@@ -920,7 +930,11 @@ function buildPlayer() {
   };
   $('#p-play').onclick = () => { haptic(); audio.paused ? audio.play() : audio.pause(); };
   $('#p-prev').onclick = () => { haptic(); if (curIdx > 0) goTrack(curIdx - 1); };
-  $('#p-next').onclick = () => { haptic(); if (curIdx < activeTour.checkpoints.length - 1) goTrack(curIdx + 1); };
+  $('#p-next').onclick = () => {
+    haptic();
+    const pt = getPlayerTour();
+    if (pt && curIdx < pt.checkpoints.length - 1) goTrack(curIdx + 1);
+  };
   $('#p-skip-back').onclick = () => { haptic(8); skipAudio(-SKIP_SEC); };
   $('#p-skip-fwd').onclick = () => { haptic(8); skipAudio(SKIP_SEC); };
   $('#p-dismiss').onclick = () => { haptic(); stopPlayer(); };
@@ -936,20 +950,33 @@ function buildPlayer() {
     expandPlayer();
   };
   $('#p-mark-done').onclick = () => {
-    const cp = curIdx >= 0 ? ordered()[curIdx] : null;
+    const cp = curIdx >= 0 ? playerOrdered()[curIdx] : null;
     if (cp) toggleMarkCompleted(cp.id);
   };
   syncNavButtons();
 }
 
+function getPlayerTour() {
+  if (!playingTourId || !isPlayerOpen()) return activeTour;
+  if (activeTour?.id === playingTourId) return activeTour;
+  const meta = INDEX.tours.find((x) => x.id === playingTourId);
+  if (!meta) return activeTour;
+  return tourCache.get(`${playingTourId}@${meta.version}`) || activeTour;
+}
+
 const ordered = () => activeTour.checkpoints.slice().sort((a, b) => a.order - b.order);
+const playerOrdered = () => {
+  const t = getPlayerTour();
+  return t ? t.checkpoints.slice().sort((a, b) => a.order - b.order) : [];
+};
 
 function syncNavButtons() {
   const prev = $('#p-prev');
   const next = $('#p-next');
-  if (!prev || !next || !activeTour) return;
+  const pt = getPlayerTour();
+  if (!prev || !next || !pt) return;
   prev.disabled = curIdx <= 0;
-  next.disabled = curIdx < 0 || curIdx >= activeTour.checkpoints.length - 1;
+  next.disabled = curIdx < 0 || curIdx >= pt.checkpoints.length - 1;
 }
 
 function resetPlayerUi() {
@@ -968,16 +995,19 @@ function resetPlayerUi() {
   syncNavButtons();
 }
 
-function playIndex(i, { autoplay = false } = {}) {
-  const cp = ordered()[i];
+function playIndex(i, { autoplay = false, tour = null } = {}) {
+  const t = tour || activeTour;
+  if (!t) return;
+  const list = t.checkpoints.slice().sort((a, b) => a.order - b.order);
+  const cp = list[i];
   if (!cp) return;
   curIdx = i;
-  playingTourId = activeTour.id;
+  playingTourId = t.id;
   maxListenedSec = 0;
   resetPlayerUi();
   const hasAudio = !!cp.audio;
   if (hasAudio) {
-    audio.src = activeTour.basePath + cp.audio;
+    audio.src = t.basePath + cp.audio;
     audio.playbackRate = playSpeed;
     audio.currentTime = 0;
     updateMediaSession(cp);
@@ -989,7 +1019,7 @@ function playIndex(i, { autoplay = false } = {}) {
     clearMediaSession();
   }
   $('#player').classList.toggle('info-only', !hasAudio);
-  saveProgress(activeTour.id, i);
+  saveProgress(t.id, i);
   $('#p-title').textContent = `${cp.order}. ${cp.shortTitle || cp.title}`;
   $('#p-transcript').textContent = cp.transcript || '';
   $('#p-transcript').scrollTop = 0;
@@ -1010,7 +1040,7 @@ function playIndex(i, { autoplay = false } = {}) {
 
 function goTrack(idx) {
   const wasPlaying = !!(audio?.src && !audio.paused);
-  playIndex(idx, { autoplay: wasPlaying });
+  playIndex(idx, { autoplay: wasPlaying, tour: getPlayerTour() });
 }
 
 function playById(id, { autoplay = false } = {}) {
@@ -1020,7 +1050,9 @@ function playById(id, { autoplay = false } = {}) {
 
 function markPlaying(on) {
   document.querySelectorAll('.cp-card').forEach((r) => r.classList.remove('playing'));
-  if (on && curIdx >= 0) document.querySelector(`.cp-card[data-i="${curIdx}"]`)?.classList.add('playing');
+  if (on && curIdx >= 0 && activeTour?.id === playingTourId) {
+    document.querySelector(`.cp-card[data-i="${curIdx}"]`)?.classList.add('playing');
+  }
 }
 function stopPlayer() {
   if (audio) { audio.pause(); audio.removeAttribute('src'); }
@@ -1051,8 +1083,10 @@ function listenedEnough() {
 }
 
 function tryMarkCompleted(idx) {
-  if (!activeTour || idx < 0) return false;
-  const cp = ordered()[idx];
+  const pt = getPlayerTour();
+  if (!pt || idx < 0) return false;
+  const list = pt.checkpoints.slice().sort((a, b) => a.order - b.order);
+  const cp = list[idx];
   if (!cp || !cp.audio) return false;
   if (!listenedEnough()) return false;
   markCompleted(cp.id);
@@ -1060,14 +1094,25 @@ function tryMarkCompleted(idx) {
 }
 
 function markCompleted(cpId) {
-  if (!activeTour || completedSet.has(cpId)) return false;
-  completedSet.add(cpId);
-  localStorage.setItem('completed-' + activeTour.id, JSON.stringify([...completedSet]));
-  syncCpListRow(cpId);
-  syncCpMapPin(cpId);
-  syncMarkDoneBtn();
-  const total = audioCheckpointCount(activeTour) || tourCheckpointTotal(INDEX.tours.find((x) => x.id === activeTour.id) || {});
-  if (isTourFullyCompleted(activeTour.id, total)) showCompletion();
+  const tourId = isPlayerOpen() && playingTourId ? playingTourId : activeTour?.id;
+  if (!tourId) return false;
+  if (tourId === activeTour?.id) {
+    if (completedSet.has(cpId)) return false;
+    completedSet.add(cpId);
+    localStorage.setItem('completed-' + tourId, JSON.stringify([...completedSet]));
+    syncCpListRow(cpId);
+    syncCpMapPin(cpId);
+    syncMarkDoneBtn();
+    const total = audioCheckpointCount(activeTour) || tourCheckpointTotal(INDEX.tours.find((x) => x.id === activeTour.id) || {});
+    if (isTourFullyCompleted(activeTour.id, total)) showCompletion();
+  } else {
+    let set;
+    try { set = new Set(JSON.parse(localStorage.getItem('completed-' + tourId) || '[]')); }
+    catch { set = new Set(); }
+    if (set.has(cpId)) return false;
+    set.add(cpId);
+    localStorage.setItem('completed-' + tourId, JSON.stringify([...set]));
+  }
   return true;
 }
 
@@ -1097,10 +1142,11 @@ function syncMarkDoneBtn() {
   const btn = $('#p-mark-done');
   const row = $('#p-mark-row');
   if (!btn || !row) return;
-  const cp = curIdx >= 0 ? ordered()[curIdx] : null;
+  const pt = getPlayerTour();
+  const cp = curIdx >= 0 ? playerOrdered()[curIdx] : null;
   if (!cp?.audio) { row.hidden = true; return; }
   row.hidden = false;
-  const done = completedSet.has(cp.id);
+  const done = pt && (pt.id === activeTour?.id ? completedSet : loadCompleted(pt.id)).has(cp.id);
   btn.disabled = false;
   btn.textContent = done ? t('markCompletedUndo') : t('markCompleted');
   btn.classList.remove('good');
