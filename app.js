@@ -400,6 +400,7 @@ async function renderMap() {
 
   const hasWp = (activeTour.waypoints || []).length > 0;
   $('#wp-toggle').hidden = !hasWp;
+  if (!hasWp) $('#gps-btn').style.bottom = '140px';
   if (hasWp) {
     $('#wp-toggle').onclick = () => {
       showWp = !showWp;
@@ -426,6 +427,7 @@ async function renderMap() {
     if (nowOff) {
       if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
       if (meLayer) { map.removeLayer(meLayer); meLayer = null; }
+      didFit = false;
       if (bbox) map.fitBounds([[bbox.s, bbox.w], [bbox.n, bbox.e]]);
       else if (pts.length) map.fitBounds(pts, { padding: [30, 30] });
     } else {
