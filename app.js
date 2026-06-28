@@ -447,7 +447,7 @@ function pickNearby(cpId) {
   promptedSet.add(cpId);
   hideNearbyCard();
   haptic();
-  playById(cpId);
+  playById(cpId, { autoplay: true });
 }
 
 function showNearbyCard(inRange) {
@@ -983,7 +983,10 @@ function goTrack(idx) {
   playIndex(idx, { autoplay: wasPlaying });
 }
 
-function playById(id) { const i = ordered().findIndex((c) => c.id === id); if (i >= 0) playIndex(i); }
+function playById(id, { autoplay = false } = {}) {
+  const i = ordered().findIndex((c) => c.id === id);
+  if (i >= 0) playIndex(i, { autoplay });
+}
 
 function markPlaying(on) {
   document.querySelectorAll('.cp-card').forEach((r) => r.classList.remove('playing'));
