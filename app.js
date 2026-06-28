@@ -6,7 +6,6 @@
 const SHELL_VERSION = 'v1';
 const $ = (sel, el = document) => el.querySelector(sel);
 const app = $('#app');
-const netEl = $('#net');
 
 let STR = {};                 // ui strings
 let INDEX = null;             // tour catalog
@@ -61,7 +60,6 @@ async function boot() {
     return;
   }
   document.title = INDEX.appName || document.title;
-  initNet();
   detectWebview();
   registerSW();
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
@@ -117,25 +115,6 @@ async function hardRefresh() {
     await Promise.all(regs.map((r) => r.unregister()));
   } catch {}
   location.reload(true);
-}
-
-/* ---------- network indicator ---------- */
-function initNet() {
-  const setNetH = () => {
-    const h = netEl.hidden ? 0 : netEl.getBoundingClientRect().height;
-    document.documentElement.style.setProperty('--net-h', h + 'px');
-  };
-  const upd = () => {
-    if (navigator.onLine) {
-      netEl.className = 'net on'; netEl.textContent = t('onlineIndicator'); netEl.hidden = true;
-    } else {
-      netEl.className = 'net off'; netEl.textContent = t('offlineIndicator'); netEl.hidden = false;
-    }
-    requestAnimationFrame(setNetH);
-  };
-  window.addEventListener('online', upd);
-  window.addEventListener('offline', upd);
-  upd();
 }
 
 /* detect in-app browser webviews (Telegram/Instagram/etc.) where A2HS is unavailable */

@@ -3,7 +3,7 @@
    when the app is online. */
 'use strict';
 
-const SHELL = 'shell-v37';
+const SHELL = 'shell-v38';
 const SHELL_ASSETS = [
   './', 'index.html', 'app.css', 'app.js', 'manifest.json',
   'lib/leaflet.js', 'lib/leaflet.css',
