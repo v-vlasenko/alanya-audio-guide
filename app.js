@@ -65,6 +65,7 @@ async function boot() {
   detectWebview();
   registerSW();
   initResumeRoute();
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   window.addEventListener('hashchange', route);
   route();
 }
@@ -158,6 +159,10 @@ function isPlayerMini() {
   return $('#player')?.classList.contains('mini') ?? false;
 }
 
+function resetPageScroll() {
+  window.scrollTo(0, 0);
+}
+
 function route() {
   const m = location.hash.match(/^#\/tour\/([\w-]+)/);
   const nextTourId = m?.[1] ?? null;
@@ -168,6 +173,7 @@ function route() {
   promptedSet = new Set();
 
   if (nextTourId) {
+    resetPageScroll();
     if (playerOpen && playingTourId && playingTourId !== nextTourId && !isPlayerMini()) stopPlayer();
     renderTour(nextTourId);
   } else {
@@ -380,6 +386,8 @@ async function renderTour(id) {
     syncNavButtons();
     syncMarkDoneBtn();
   }
+  resetPageScroll();
+  requestAnimationFrame(resetPageScroll);
 }
 
 function switchTab(which) {
@@ -652,7 +660,10 @@ async function renderMap() {
 
   if (bbox) map.fitBounds([[bbox.s, bbox.w], [bbox.n, bbox.e]]);
   else if (pts.length) map.fitBounds(pts, { padding: [30, 30] });
-  setTimeout(() => map.invalidateSize(), 60);
+  setTimeout(() => {
+    map.invalidateSize();
+    resetPageScroll();
+  }, 60);
 
   $('#recenter').onclick = () => { if (meLayer) map.panTo(meLayer.getLatLng()); };
 
