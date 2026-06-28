@@ -1,6 +1,6 @@
 /* Аудіогіди Аланії — offline-first multi-tour audio guide (vanilla, no build).
    v1: tour picker, per-tour offline download, manual list+map playback,
-   live "you are here" dot (position only). Geofence auto-prompt = v2. */
+   GPS proximity prompt-to-play (nearest-first in clusters), live position dot. */
 'use strict';
 
 const SHELL_VERSION = 'v1';
@@ -19,6 +19,15 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const cacheName = (id, version) => `tour-${id}-${version}`;
 const fmtTime = (s) => { s = Math.floor(s || 0); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const haptic = (ms = 10) => navigator.vibrate?.(ms);
+
+const EARTH_R = 6371000;
+function haversineM(lat1, lng1, lat2, lng2) {
+  const r = (d) => (d * Math.PI) / 180;
+  const dLat = r(lat2 - lat1);
+  const dLng = r(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(r(lat1)) * Math.cos(r(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_R * Math.asin(Math.sqrt(a));
+}
 
 /* slippy-tile math (mirrors scripts/fetch-tiles.mjs) */
 const lon2x = (lon, z) => Math.floor(((lon + 180) / 360) * 2 ** z);
@@ -100,6 +109,8 @@ function detectWebview() {
 function route() {
   stopPlayer();
   teardownMap();
+  hideNearbyCard();
+  promptedSet = new Set();
   const m = location.hash.match(/^#\/tour\/([\w-]+)/);
   if (m) renderTour(m[1]); else renderHome();
 }
@@ -122,15 +133,27 @@ function renderHome() {
   $('#hard-refresh').onclick = hardRefresh;
 }
 
+function tourCheckpointTotal(tr) {
+  if (activeTour?.id === tr.id) return activeTour.checkpoints.length;
+  return tr.checkpointCount || 0;
+}
+
+function isTourFullyCompleted(id, total) {
+  if (!total) return false;
+  return loadCompleted(id).size >= total;
+}
+
 function tourCard(tr) {
+  const full = isTourFullyCompleted(tr.id, tourCheckpointTotal(tr));
   const card = el(`
-    <article class="tour-card">
+    <article class="tour-card${full ? ' is-complete' : ''}">
       <div class="cover-wrap">
         <div class="cover"></div>
       </div>
       <div class="tour-body">
         <h2>${esc(tr.title)}</h2>
         <p class="muted">${esc(tr.subtitle || '')}</p>
+        ${full ? `<p class="tour-done-badge">${esc(t('tourFullyCompleted'))}</p>` : ''}
         ${tr.bestTime ? `<p class="best-time">⏰ ${esc(tr.bestTime)}</p>` : ''}
         <div class="meta-row">
           <span>${esc(t('tourCheckpointsLabel'))}: <b>${tr.checkpointCount}</b></span>
@@ -226,7 +249,6 @@ async function tourAssetUrls(tr) {
 
 /* ================= TOUR VIEW ================= */
 let activeTour = null;
-let visitedSet = new Set();
 let completedSet = new Set();
 
 async function loadTour(id) {
@@ -244,8 +266,8 @@ async function renderTour(id) {
   try { tour = await loadTour(id); }
   catch { app.innerHTML = `<p>${esc(t('notDownloadedHint'))}</p><button class="btn" onclick="location.hash='#/'">${esc(t('backToTours'))}</button>`; return; }
   activeTour = tour;
-  visitedSet = loadVisited(id);
   completedSet = loadCompleted(id);
+  promptedSet = new Set();
 
   app.innerHTML = `
     <div class="topbar">
@@ -253,16 +275,20 @@ async function renderTour(id) {
       <h2>${esc(tour.title)}</h2>
     </div>
     ${tour.tip ? `<div class="tip">💡 ${esc(tour.tip)}</div>` : ''}
+    <div class="usage-tips"><p>${esc(t('gpsKeepOpenTip'))}</p></div>
     <button class="btn" id="start">${esc(t('startTour'))}</button>
+    <div class="tour-actions"><button class="btn ghost sm" id="reset-progress">${esc(t('resetProgress'))}</button></div>
     <div class="tabs" role="tablist">
       <button id="tab-list" role="tab" aria-selected="false">${esc(t('tabList'))}</button>
       <button id="tab-map" role="tab" aria-selected="true">${esc(t('tabMap'))}</button>
     </div>
     <section id="pane-list" hidden></section>
     <section id="pane-map"></section>
+    <div class="nearby-card" id="nearby-card" hidden></div>
     <div class="player" id="player"></div>
   `;
   $('#back').onclick = () => { location.hash = '#/'; };
+  $('#reset-progress').onclick = () => resetTourProgress(id);
   const savedIdx = loadProgress(id);
   if (savedIdx >= 0 && savedIdx < tour.checkpoints.length) {
     const cp = ordered()[savedIdx];
@@ -292,8 +318,9 @@ function renderList() {
   pane.innerHTML = '<div class="cp-list"></div>';
   const list = $('.cp-list', pane);
   activeTour.checkpoints.slice().sort((a, b) => a.order - b.order).forEach((cp, i) => {
+    const wrap = el(`<div class="cp-row" data-i="${i}"></div>`);
     const row = el(`
-      <button class="cp" data-i="${i}">
+      <button class="cp" data-i="${i}" data-id="${cp.id}">
         <span class="num">${cp.order}</span>
         <span class="t">
           <b>${esc(cp.shortTitle || cp.title)}</b>
@@ -301,21 +328,151 @@ function renderList() {
           <span class="state"></span>
         </span>
       </button>`);
-    if (completedSet.has(cp.id)) { const s = $('.state', row); s.textContent = '✓'; s.classList.add('done'); }
-    else if (visitedSet.has(cp.id)) $('.state', row).textContent = t('visited');
+    const markBtn = el(`<button type="button" class="cp-mark" title="${esc(t('markCompleted'))}">✓</button>`);
+    if (!cp.audio) markBtn.hidden = true;
+    markBtn.onclick = (e) => { e.stopPropagation(); haptic(); manualMarkCompleted(cp.id); };
+    wrap.appendChild(row);
+    wrap.appendChild(markBtn);
+    syncCpListRow(cp.id, row, markBtn);
     row.onclick = () => { haptic(); playIndex(i); };
-    list.appendChild(row);
+    list.appendChild(wrap);
   });
+}
+
+function syncCpListRow(cpId, row, markBtn) {
+  if (!row) {
+    const i = ordered().findIndex((c) => c.id === cpId);
+    const wrap = document.querySelector(`.cp-row[data-i="${i}"]`);
+    row = wrap?.querySelector('.cp');
+    markBtn = wrap?.querySelector('.cp-mark');
+  }
+  if (!row) return;
+  const cp = ordered().find((c) => c.id === cpId);
+  if (!cp) return;
+  const num = $('.num', row);
+  const state = $('.state', row);
+  const done = completedSet.has(cpId);
+  if (done) {
+    row.classList.add('completed');
+    num.textContent = '✓';
+    num.classList.add('done');
+    state.textContent = t('completed');
+    state.classList.add('done');
+  } else {
+    row.classList.remove('completed');
+    num.textContent = cp.order;
+    num.classList.remove('done');
+    state.textContent = '';
+    state.classList.remove('done');
+  }
+  if (markBtn) {
+    markBtn.classList.toggle('done', done);
+    markBtn.disabled = done;
+    markBtn.title = done ? t('markCompletedDone') : t('markCompleted');
+  }
 }
 
 /* ================= MAP (Leaflet + bundled tiles + live dot) ================= */
 let map = null, meLayer = null, watchId = null, didFit = false;
-let wpMarkers = [], showWp = true;
+let wpMarkers = [], cpMarkers = new Map(), showWp = true;
+let promptedSet = new Set();
+let lastPos = null;
+
+function cpRadius(cp) {
+  return cp.radiusM ?? activeTour?.defaultRadiusM ?? 30;
+}
+
+function checkpointsInRange(lat, lng) {
+  if (!activeTour) return [];
+  return ordered()
+    .map((cp) => ({ cp, dist: haversineM(lat, lng, cp.lat, cp.lng) }))
+    .filter(({ cp, dist }) => dist <= cpRadius(cp))
+    .sort((a, b) => a.dist - b.dist);
+}
+
+function hideNearbyCard() {
+  const card = $('#nearby-card');
+  if (card) { card.hidden = true; card.innerHTML = ''; }
+}
+
+function dismissNearby(ids) {
+  ids.forEach((id) => promptedSet.add(id));
+  hideNearbyCard();
+  haptic(8);
+}
+
+function pickNearby(cpId) {
+  promptedSet.add(cpId);
+  hideNearbyCard();
+  haptic();
+  playById(cpId);
+}
+
+function showNearbyCard(inRange) {
+  const pending = inRange.filter(({ cp }) => !promptedSet.has(cp.id));
+  if (!pending.length) { hideNearbyCard(); return; }
+
+  const card = $('#nearby-card');
+  if (!card) return;
+
+  if (pending.length === 1) {
+    const { cp } = pending[0];
+    card.innerHTML = `
+      <button type="button" class="nearby-x" aria-label="${esc(t('close'))}">✕</button>
+      <p class="nearby-msg">${esc(t('nearbyPrefix'))} <b>${esc(cp.shortTitle || cp.title)}</b></p>
+      <button type="button" class="btn nearby-go">${esc(t('listen'))}</button>`;
+    $('.nearby-x', card).onclick = () => dismissNearby([cp.id]);
+    $('.nearby-go', card).onclick = () => pickNearby(cp.id);
+  } else {
+    const rows = pending.slice(0, 4).map(({ cp }) =>
+      `<button type="button" class="btn secondary nearby-pick" data-id="${esc(cp.id)}">${cp.order}. ${esc(cp.shortTitle || cp.title)} — ${esc(t('listen'))}</button>`
+    ).join('');
+    card.innerHTML = `
+      <button type="button" class="nearby-x" aria-label="${esc(t('close'))}">✕</button>
+      <p class="nearby-msg"><b>${esc(t('nearbyMultiple'))}</b></p>
+      <p class="nearby-hint muted">${esc(t('nearbyChoose'))}</p>
+      <div class="nearby-picks">${rows}</div>`;
+    $('.nearby-x', card).onclick = () => dismissNearby(pending.slice(0, 4).map(({ cp }) => cp.id));
+    card.querySelectorAll('.nearby-pick').forEach((btn) => {
+      btn.onclick = () => pickNearby(btn.dataset.id);
+    });
+  }
+  card.hidden = false;
+}
+
+function checkProximity(lat, lng) {
+  if (!activeTour) return;
+  if (audio && !audio.paused) return;
+  lastPos = { lat, lng };
+  showNearbyCard(checkpointsInRange(lat, lng));
+}
+
+function cpPinHtml(cp) {
+  const done = completedSet.has(cp.id);
+  const cls = ['pin', cp.optional && 'optional', done && 'done'].filter(Boolean).join(' ');
+  return `<div class="${cls}"><span>${done ? '✓' : cp.order}</span></div>`;
+}
+
+function cpPinIcon(cp) {
+  return L.divIcon({ className: '', html: cpPinHtml(cp), iconSize: [30, 30], iconAnchor: [15, 30] });
+}
+
+function syncCpMapPin(cpId) {
+  const mk = cpMarkers.get(cpId);
+  if (!mk) return;
+  const cp = ordered().find((c) => c.id === cpId);
+  if (!cp) return;
+  mk.setIcon(cpPinIcon(cp));
+}
+
+function refreshAllCpPins() {
+  ordered().forEach((cp) => syncCpMapPin(cp.id));
+}
 
 function teardownMap() {
   if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
   if (map) { map.remove(); map = null; }
-  meLayer = null; didFit = false; wpMarkers = []; showWp = true;
+  meLayer = null; didFit = false; wpMarkers = []; cpMarkers = new Map(); showWp = true;
 }
 
 async function renderMap() {
@@ -381,10 +538,9 @@ async function renderMap() {
   // numbered markers
   const pts = [];
   activeTour.checkpoints.forEach((cp) => {
-    const cls = cp.optional ? 'pin optional' : 'pin';
-    const icon = L.divIcon({ className: '', html: `<div class="${cls}"><span>${cp.order}</span></div>`, iconSize: [30, 30], iconAnchor: [15, 30] });
-    const mk = L.marker([cp.lat, cp.lng], { icon }).addTo(map);
+    const mk = L.marker([cp.lat, cp.lng], { icon: cpPinIcon(cp) }).addTo(map);
     mk.on('click', () => { haptic(); playById(cp.id); });
+    cpMarkers.set(cp.id, mk);
     pts.push([cp.lat, cp.lng]);
   });
 
@@ -441,13 +597,16 @@ function startWatch() {
   if (!('geolocation' in navigator)) return;
   watchId = navigator.geolocation.watchPosition(
     (pos) => {
-      const ll = [pos.coords.latitude, pos.coords.longitude];
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const ll = [lat, lng];
       if (!meLayer) {
         meLayer = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(map);
         if (!didFit) { map.setView(ll, 17); didFit = true; }
       } else meLayer.setLatLng(ll);
+      checkProximity(lat, lng);
     },
-    () => {},                                   // denied/err: map still works, no dot
+    () => {},
     { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
   );
 }
@@ -455,6 +614,8 @@ function startWatch() {
 /* ================= PLAYER ================= */
 let audio = null, curIdx = -1;
 let playSpeed = 1.0;
+let maxListenedSec = 0;
+const COMPLETE_RATIO = 0.95;
 
 function buildPlayer() {
   const p = $('#player');
@@ -471,6 +632,7 @@ function buildPlayer() {
       <button class="btn secondary" id="p-next">${esc(t('next'))}</button>
     </div>
     <div class="p-speed-row"><button class="btn ghost sm" id="p-speed" title="Швидкість відтворення">1×</button></div>
+    <div class="p-mark-row" id="p-mark-row"><button class="btn ghost sm" id="p-mark-done">${esc(t('markCompleted'))}</button></div>
     <div class="transcript" id="p-transcript"></div>
   `;
   audio = new Audio();
@@ -479,18 +641,26 @@ function buildPlayer() {
   audio.addEventListener('timeupdate', () => {
     const cur = $('#p-cur'); if (!cur) return;
     cur.textContent = fmtTime(audio.currentTime);
-    if (!seeking) $('#p-seek').value = Math.floor(audio.currentTime);
-    if (audio.duration > 0 && audio.currentTime / audio.duration >= 0.5) {
-      const cp = ordered()[curIdx];
-      if (cp) markVisited(cp.id);
+    if (!seeking) {
+      $('#p-seek').value = Math.floor(audio.currentTime);
+      if (audio.currentTime > maxListenedSec) maxListenedSec = audio.currentTime;
     }
   });
   audio.addEventListener('play', () => { const b = $('#p-play'); if (b) b.textContent = t('pause'); markPlaying(true); });
-  audio.addEventListener('pause', () => { const b = $('#p-play'); if (b) b.textContent = t('play'); markPlaying(false); });
+  audio.addEventListener('pause', () => {
+    const b = $('#p-play'); if (b) b.textContent = t('play'); markPlaying(false);
+    if (lastPos) checkProximity(lastPos.lat, lastPos.lng);
+  });
   audio.addEventListener('ended', () => {
-    markCompleted(curIdx);
-    if (activeTour && curIdx < activeTour.checkpoints.length - 1) playIndex(curIdx + 1);
-    else if (activeTour) showCompletion();
+    maxListenedSec = Math.max(maxListenedSec, audio.duration || 0);
+    if (tryMarkCompleted(curIdx)) {
+      const total = audioCheckpointCount(activeTour);
+      if (!isTourFullyCompleted(activeTour.id, total) && curIdx < activeTour.checkpoints.length - 1) {
+        playIndex(curIdx + 1);
+      }
+    } else if (lastPos) {
+      checkProximity(lastPos.lat, lastPos.lng);
+    }
   });
   audio.addEventListener('error', () => { toast(t('errorAudioBody')); });
 
@@ -511,6 +681,10 @@ function buildPlayer() {
   $('#p-prev').onclick = () => { haptic(); if (curIdx > 0) playIndex(curIdx - 1); };
   $('#p-next').onclick = () => { haptic(); if (curIdx < activeTour.checkpoints.length - 1) playIndex(curIdx + 1); };
   $('#p-close').onclick = stopPlayer;
+  $('#p-mark-done').onclick = () => {
+    const cp = curIdx >= 0 ? ordered()[curIdx] : null;
+    if (cp) manualMarkCompleted(cp.id);
+  };
 }
 
 const ordered = () => activeTour.checkpoints.slice().sort((a, b) => a.order - b.order);
@@ -519,6 +693,7 @@ function playIndex(i) {
   const cp = ordered()[i];
   if (!cp) return;
   curIdx = i;
+  maxListenedSec = 0;
   const hasAudio = !!cp.audio;
   if (hasAudio) {
     audio.src = activeTour.basePath + cp.audio;
@@ -533,6 +708,8 @@ function playIndex(i) {
   $('#p-transcript').textContent = cp.transcript || '';
   $('#p-transcript').scrollTop = 0;
   $('#player').classList.add('open');
+  syncMarkDoneBtn();
+  $('#nearby-card')?.classList.add('above-player');
 }
 function playById(id) { const i = ordered().findIndex((c) => c.id === id); if (i >= 0) playIndex(i); }
 
@@ -544,29 +721,78 @@ function stopPlayer() {
   if (audio) { audio.pause(); audio.removeAttribute('src'); }
   curIdx = -1;
   $('#player')?.classList.remove('open');
+  $('#nearby-card')?.classList.remove('above-player');
+  if (lastPos) checkProximity(lastPos.lat, lastPos.lng);
 }
 
-/* visited persistence */
-function loadVisited(id) { try { return new Set(JSON.parse(localStorage.getItem('visited-' + id) || '[]')); } catch { return new Set(); } }
-function markVisited(cpId) {
-  if (!activeTour || visitedSet.has(cpId)) return;
-  visitedSet.add(cpId);
-  localStorage.setItem('visited-' + activeTour.id, JSON.stringify([...visitedSet]));
-  const i = ordered().findIndex((c) => c.id === cpId);
-  const row = document.querySelector(`.cp[data-i="${i}"] .state`);
-  if (row && !completedSet.has(cpId)) row.textContent = t('visited');
-}
-
-/* completed persistence (✓ after audio ends) */
+/* completed persistence (full listen or manual mark) */
 function loadCompleted(id) { try { return new Set(JSON.parse(localStorage.getItem('completed-' + id) || '[]')); } catch { return new Set(); } }
-function markCompleted(idx) {
-  if (!activeTour) return;
+
+function audioCheckpointCount(tour) {
+  return tour?.checkpoints?.filter((c) => c.audio).length ?? 0;
+}
+
+function listenedEnough() {
+  const dur = audio?.duration;
+  if (!dur || !Number.isFinite(dur)) return false;
+  const need = Math.max(dur * COMPLETE_RATIO, dur - 2);
+  return maxListenedSec >= need;
+}
+
+function tryMarkCompleted(idx) {
+  if (!activeTour || idx < 0) return false;
   const cp = ordered()[idx];
-  if (!cp) return;
-  completedSet.add(cp.id);
+  if (!cp || !cp.audio) return false;
+  if (!listenedEnough()) return false;
+  markCompleted(cp.id);
+  return true;
+}
+
+function markCompleted(cpId) {
+  if (!activeTour || completedSet.has(cpId)) return false;
+  completedSet.add(cpId);
   localStorage.setItem('completed-' + activeTour.id, JSON.stringify([...completedSet]));
-  const row = document.querySelector(`.cp[data-i="${idx}"] .state`);
-  if (row) { row.textContent = '✓'; row.classList.add('done'); }
+  syncCpListRow(cpId);
+  syncCpMapPin(cpId);
+  syncMarkDoneBtn();
+  const total = audioCheckpointCount(activeTour) || tourCheckpointTotal(INDEX.tours.find((x) => x.id === activeTour.id) || {});
+  if (isTourFullyCompleted(activeTour.id, total)) showCompletion();
+  return true;
+}
+
+function manualMarkCompleted(cpId) {
+  if (markCompleted(cpId)) haptic(8);
+}
+
+function syncMarkDoneBtn() {
+  const btn = $('#p-mark-done');
+  const row = $('#p-mark-row');
+  if (!btn || !row) return;
+  const cp = curIdx >= 0 ? ordered()[curIdx] : null;
+  if (!cp?.audio) { row.hidden = true; return; }
+  row.hidden = false;
+  const done = completedSet.has(cp.id);
+  btn.disabled = done;
+  btn.textContent = done ? t('markCompletedDone') : t('markCompleted');
+  btn.classList.toggle('good', done);
+}
+
+function resetTourProgress(id) {
+  if (!confirm(t('resetProgressConfirm'))) return;
+  haptic(8);
+  localStorage.removeItem('completed-' + id);
+  localStorage.removeItem('visited-' + id);
+  localStorage.removeItem('progress-' + id);
+  completedSet = new Set();
+  stopPlayer();
+  const startBtn = $('#start');
+  if (startBtn) {
+    startBtn.textContent = t('startTour');
+    startBtn.onclick = () => { haptic(); playIndex(0); };
+  }
+  renderList();
+  refreshAllCpPins();
+  toast(t('resetProgressDone'));
 }
 
 /* progress persistence (resume where user left off) */
@@ -575,6 +801,7 @@ function saveProgress(id, idx) { localStorage.setItem('progress-' + id, idx); }
 
 /* tour completion screen */
 function showCompletion() {
+  if ($('#completion-overlay')) return;
   localStorage.removeItem('progress-' + activeTour.id);
   haptic(40);
   const title = esc(activeTour?.title || '');

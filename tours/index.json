@@ -23,10 +23,10 @@
       "region": "Аланія, Туреччина",
       "path": "tours/alanya-castle/tour.json",
       "cover": "tours/alanya-castle/cover.jpg",
-      "checkpointCount": 9,
-      "durationMin": 60,
-      "approxSizeMb": 12,
-      "version": "1.0"
+      "checkpointCount": 24,
+      "durationMin": 90,
+      "approxSizeMb": 18,
+      "version": "1.3"
     },
     {
       "id": "alanya-harbor",

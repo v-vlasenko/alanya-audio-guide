@@ -64,6 +64,11 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .dl-bar{height:8px; border-radius:4px; background:var(--line); overflow:hidden; margin-top:8px}
 .dl-bar>i{display:block; height:100%; width:0; background:var(--accent); transition:width .2s}
 .best-time{color:#ffd28a; font-size:14px; margin-top:6px}
+.tour-done-badge{
+  display:inline-block; margin-top:8px; padding:6px 12px; border-radius:999px;
+  background:#1a3d28; color:#7dcea0; font-size:14px; font-weight:700;
+}
+.tour-card.is-complete{border-color:#3d9a5f66}
 
 /* ---- tour view ---- */
 .topbar{display:flex; align-items:center; gap:12px; padding:6px 0 12px; position:sticky; top:var(--net-h,0px);
@@ -74,10 +79,22 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
   border:1px solid var(--line); font-weight:700; color:var(--muted)}
 .tabs button[aria-selected=true]{background:var(--accent); color:#1a0f08; border-color:var(--accent)}
 .tip{background:var(--bg2); border:1px solid var(--line); border-radius:12px; padding:12px 14px;
-  color:var(--muted); font-size:15px; margin-bottom:14px}
+  color:var(--muted); font-size:15px; margin-bottom:10px}
+.usage-tips{background:var(--bg2); border:1px solid #3a4a5a; border-radius:12px; padding:10px 14px;
+  color:#a8c4d8; font-size:14px; line-height:1.45; margin-bottom:14px}
+.usage-tips p{margin:0}
 
 /* ---- checkpoint list ---- */
 .cp-list{display:flex; flex-direction:column; gap:10px}
+.cp-row{display:flex; align-items:stretch; gap:8px}
+.cp-row .cp{flex:1; min-width:0}
+.cp-mark{
+  flex:0 0 46px; min-height:var(--tap); border-radius:14px;
+  background:var(--bg2); border:1px solid var(--line); color:var(--muted);
+  font-size:20px; font-weight:800;
+}
+.cp-mark:active{opacity:.85}
+.cp-mark.done{background:#3d9a5f; border-color:#3d9a5f; color:#fff; opacity:1}
 .cp{
   display:flex; align-items:center; gap:14px; width:100%; text-align:left;
   background:var(--card); border:1px solid var(--line); border-radius:14px;
@@ -91,7 +108,9 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .cp .t b{display:block; font-size:17px}
 .cp .t small{color:var(--muted)}
 .cp .state{font-size:13px; color:var(--good)}
-.cp .state.done{font-weight:800; font-size:16px}
+.cp .num.done{background:#3d9a5f; color:#fff}
+.cp.completed{border-color:#3d9a5f44}
+.cp .state.done{font-weight:800; font-size:16px; color:#7dcea0}
 .badge{display:inline-block; font-size:12px; font-weight:700; color:#ffd28a;
   background:#3a2a12; border-radius:8px; padding:2px 8px; margin-top:4px}
 
@@ -121,6 +140,8 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
   display:flex; align-items:center; justify-content:center; box-shadow:0 2px 5px rgba(0,0,0,.5)}
 .pin>span{transform:rotate(45deg)}
 .pin.optional{background:#caa15a}
+.pin.done{background:#3d9a5f; color:#fff}
+.tour-actions{margin:-6px 0 14px; text-align:right}
 .me-dot{width:18px; height:18px; border-radius:50%; background:#2b8cff; border:3px solid #fff;
   box-shadow:0 0 0 6px rgba(43,140,255,.25)}
 .wp-pin{width:28px; height:28px; border-radius:50% 50% 50% 0; background:#4a9eff; color:#fff;
@@ -142,6 +163,8 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .seek{display:flex; align-items:center; gap:10px; font-size:13px; color:var(--muted)}
 .seek input[type=range]{flex:1; accent-color:var(--accent); height:32px}
 .pcontrols{display:flex; gap:10px; margin:10px 0 4px}
+.p-mark-row{margin:8px 0 4px}
+.p-mark-row .btn{width:100%}
 .p-speed-row{text-align:right; margin-bottom:6px}
 .pcontrols .btn{min-height:54px}
 .transcript{max-height:26vh; overflow:auto; color:var(--fg); font-size:16px; line-height:1.5;
@@ -169,9 +192,23 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .completion-actions{display:flex; flex-direction:column; gap:10px; margin-top:20px}
 .toast{position:fixed; left:50%; bottom:calc(var(--safe-b) + 90px); transform:translateX(-50%);
   background:#000; color:#fff; padding:10px 16px; border-radius:20px; z-index:1400; font-size:15px; opacity:.95}
+.nearby-card{
+  position:fixed; left:50%; bottom:calc(var(--safe-b) + 12px); z-index:750; width:100%; max-width:480px;
+  transform:translateX(-50%); background:var(--bg2); border:1px solid var(--accent); border-radius:16px;
+  padding:14px var(--pad); box-shadow:0 -4px 24px rgba(0,0,0,.45);
+}
+.nearby-card.above-player{bottom:calc(var(--safe-b) + 280px)}
+.nearby-card .nearby-x{position:absolute; top:10px; right:12px; background:none; border:none;
+  color:var(--muted); font-size:20px; width:32px; height:32px}
+.nearby-msg{margin:0 28px 10px 0; font-size:16px; line-height:1.35}
+.nearby-hint{margin:0 0 8px; font-size:14px}
+.nearby-picks{display:flex; flex-direction:column; gap:8px; max-height:36vh; overflow:auto}
+.nearby-picks .btn{min-height:48px; text-align:left; font-size:15px}
+.nearby-go{width:100%}
 [hidden]{display:none!important}
 .player.info-only .seek,
 .player.info-only .p-speed-row,
+.player.info-only .p-mark-row,
 .player.info-only #p-play{display:none}
 /* Leaflet popup dark theme */
 .leaflet-popup-content-wrapper{background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:12px}
