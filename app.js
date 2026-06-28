@@ -44,6 +44,18 @@ const lat2y = (lat, z) => {
 };
 
 /* ---------- boot ---------- */
+function fixStandaloneSafeArea() {
+  const standalone = window.navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  if (!standalone) return;
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;top:0;left:0;height:env(safe-area-inset-top);width:0;pointer-events:none;visibility:hidden';
+  document.body.appendChild(probe);
+  const inset = probe.getBoundingClientRect().height;
+  probe.remove();
+  if (inset > 0) document.documentElement.style.setProperty('--safe-t', `${inset}px`);
+  else document.documentElement.style.setProperty('--safe-t', '47px');
+}
+
 async function boot() {
   try {
     [STR, INDEX] = await Promise.all([
@@ -55,6 +67,7 @@ async function boot() {
     return;
   }
   document.title = INDEX.appName || document.title;
+  fixStandaloneSafeArea();
   initNet();
   detectWebview();
   registerSW();
