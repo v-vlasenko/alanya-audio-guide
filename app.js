@@ -82,6 +82,7 @@ function registerSW() {
 
 async function hardRefresh() {
   try {
+    clearResumeRoute();
     const keys = await caches.keys();
     await Promise.all(keys.map((k) => caches.delete(k)));
     const regs = await navigator.serviceWorker.getRegistrations();
