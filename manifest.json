@@ -1,10 +1,11 @@
 {
+  "id": "/alanya-audio-guide/",
   "name": "Аудіогіди Аланії для мами та сестричи",
   "short_name": "Аудіогіди",
   "lang": "uk",
   "dir": "ltr",
-  "start_url": ".",
-  "scope": ".",
+  "start_url": "/alanya-audio-guide/",
+  "scope": "/alanya-audio-guide/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#1c1410",

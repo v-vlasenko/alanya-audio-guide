@@ -64,6 +64,7 @@ async function boot() {
   initNet();
   detectWebview();
   registerSW();
+  initResumeRoute();
   window.addEventListener('hashchange', route);
   route();
 }
@@ -116,6 +117,32 @@ function detectWebview() {
   if (inApp && !isStandalone) {
     const w = $('#webview-warn'); w.textContent = t('openInSafariWarning'); w.hidden = false;
   }
+}
+
+function syncResumeRoute() {
+  if (playingTourId && isPlayerOpen() && audio?.src) {
+    localStorage.setItem('resume-route', `#/tour/${playingTourId}`);
+  }
+}
+
+function clearResumeRoute() {
+  localStorage.removeItem('resume-route');
+}
+
+function maybeRestoreRoute() {
+  const cur = location.hash;
+  if (cur && cur !== '#/' && cur !== '') return;
+  const saved = localStorage.getItem('resume-route');
+  if (saved?.match(/^#\/tour\/[\w-]+$/)) location.hash = saved;
+}
+
+function initResumeRoute() {
+  maybeRestoreRoute();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || !playingTourId || !audio?.src) return;
+    const want = `#/tour/${playingTourId}`;
+    if (location.hash !== want) location.hash = want;
+  });
 }
 
 /* ---------- router ---------- */
@@ -978,6 +1005,7 @@ function playIndex(i, { autoplay = false } = {}) {
     setNearbyPlayerOffset(null);
   }
   syncPlayerChrome();
+  syncResumeRoute();
 }
 
 function goTrack(idx) {
@@ -1004,6 +1032,7 @@ function stopPlayer() {
   setPlayerBackdrop(false);
   setNearbyPlayerOffset(null);
   syncPlayerChrome();
+  clearResumeRoute();
   if (lastPos) checkProximity(lastPos.lat, lastPos.lng);
 }
 

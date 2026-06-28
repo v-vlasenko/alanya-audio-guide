@@ -5,18 +5,6 @@
   "language": "uk",
   "tours": [
     {
-      "id": "proximity-test",
-      "title": "🧪 GPS proximity test",
-      "subtitle": "4+ точки біля 49.19837, 31.87306",
-      "region": "Test",
-      "path": "tours/proximity-test/tour.json",
-      "cover": "tours/alanya-damlatas/cover.jpg",
-      "checkpointCount": 5,
-      "durationMin": 2,
-      "approxSizeMb": 1,
-      "version": "1.1"
-    },
-    {
       "id": "alanya-damlatas",
       "title": "Дамлаташ і Клеопатра",
       "subtitle": "Пляж Клеопатри, печера та археологічний музей",
