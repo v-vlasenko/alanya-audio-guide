@@ -21,9 +21,11 @@ const fmtTime = (s) => { s = Math.floor(s || 0); return `${Math.floor(s / 60)}:$
 const haptic = (ms = 10) => navigator.vibrate?.(ms);
 
 const MARK_ICON = {
-  pending: '<svg class="mark-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
-  done: '<svg class="mark-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4" fill="rgba(255,255,255,.18)"/><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>',
+  done: '<svg class="mark-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>',
 };
+
+const PLAY_ICON = '<svg class="p-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>';
+const PAUSE_ICON = '<svg class="p-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/></svg>';
 
 const EARTH_R = 6371000;
 function haversineM(lat1, lng1, lat2, lng2) {
@@ -330,7 +332,7 @@ function renderList() {
   pane.innerHTML = '<div class="cp-list"></div>';
   const list = $('.cp-list', pane);
   activeTour.checkpoints.slice().sort((a, b) => a.order - b.order).forEach((cp, i) => {
-    const wrap = el(`<div class="cp-row" data-i="${i}"></div>`);
+    const card = el(`<div class="cp-card" data-i="${i}"></div>`);
     const row = el(`
       <button class="cp" data-i="${i}" data-id="${cp.id}">
         <span class="num">${cp.order}</span>
@@ -343,35 +345,36 @@ function renderList() {
     const markBtn = el(`<button type="button" class="cp-mark" title="${esc(t('markCompleted'))}"></button>`);
     if (!cp.audio) markBtn.hidden = true;
     markBtn.onclick = (e) => { e.stopPropagation(); haptic(); toggleMarkCompleted(cp.id); };
-    wrap.appendChild(row);
-    wrap.appendChild(markBtn);
+    card.appendChild(row);
+    card.appendChild(markBtn);
     syncCpListRow(cp.id, row, markBtn);
     row.onclick = () => { haptic(); playIndex(i); };
-    list.appendChild(wrap);
+    list.appendChild(card);
   });
 }
 
 function syncCpListRow(cpId, row, markBtn) {
   if (!row) {
     const i = ordered().findIndex((c) => c.id === cpId);
-    const wrap = document.querySelector(`.cp-row[data-i="${i}"]`);
-    row = wrap?.querySelector('.cp');
-    markBtn = wrap?.querySelector('.cp-mark');
+    const card = document.querySelector(`.cp-card[data-i="${i}"]`);
+    row = card?.querySelector('.cp');
+    markBtn = card?.querySelector('.cp-mark');
   }
   if (!row) return;
+  const card = row.closest('.cp-card');
   const cp = ordered().find((c) => c.id === cpId);
   if (!cp) return;
   const num = $('.num', row);
   const state = $('.state', row);
   const done = completedSet.has(cpId);
   if (done) {
-    row.classList.add('completed');
+    card?.classList.add('completed');
     num.textContent = cp.order;
     num.classList.add('done');
-    state.textContent = t('completed');
-    state.classList.add('done');
+    state.textContent = '';
+    state.classList.remove('done');
   } else {
-    row.classList.remove('completed');
+    card?.classList.remove('completed');
     num.textContent = cp.order;
     num.classList.remove('done');
     state.textContent = '';
@@ -379,7 +382,8 @@ function syncCpListRow(cpId, row, markBtn) {
   }
   if (markBtn) {
     markBtn.classList.toggle('done', done);
-    markBtn.innerHTML = done ? MARK_ICON.done : MARK_ICON.pending;
+    markBtn.innerHTML = done ? MARK_ICON.done : '';
+    markBtn.setAttribute('aria-label', done ? t('markCompletedUndo') : t('markCompleted'));
     markBtn.title = done ? t('markCompletedUndo') : t('markCompleted');
   }
 }
@@ -636,14 +640,14 @@ function buildPlayer() {
     <div class="seek">
       <span id="p-cur">0:00</span>
       <input type="range" id="p-seek" min="0" max="100" value="0" step="1">
-      <span id="p-dur">0:00</span>
+      <div class="seek-end">
+        <span id="p-dur">0:00</span>
+        <button class="p-speed" id="p-speed" type="button" title="Швидкість відтворення">1×</button>
+      </div>
     </div>
     <div class="pcontrols">
       <button class="btn secondary p-nav" id="p-prev" type="button">${esc(t('previous'))}</button>
-      <div class="p-center">
-        <button class="btn p-play-btn" id="p-play" type="button"><span class="p-play-label">${esc(t('playLabel'))}</span></button>
-        <button class="btn ghost sm p-speed" id="p-speed" type="button" title="Швидкість відтворення">1×</button>
-      </div>
+      <button class="btn p-play-btn" id="p-play" type="button" aria-label="${esc(t('playLabel'))}">${PLAY_ICON}</button>
       <button class="btn secondary p-nav" id="p-next" type="button">${esc(t('next'))}</button>
     </div>
     <div class="p-mark-row" id="p-mark-row"><button class="btn ghost sm" id="p-mark-done">${esc(t('markCompleted'))}</button></div>
@@ -661,8 +665,10 @@ function buildPlayer() {
     }
   });
   const setPlayBtn = (playing) => {
-    const label = $('#p-play .p-play-label');
-    if (label) label.textContent = playing ? t('pauseLabel') : t('playLabel');
+    const b = $('#p-play');
+    if (!b) return;
+    b.innerHTML = playing ? PAUSE_ICON : PLAY_ICON;
+    b.setAttribute('aria-label', playing ? t('pauseLabel') : t('playLabel'));
   };
   audio.addEventListener('play', () => { setPlayBtn(true); markPlaying(true); });
   audio.addEventListener('pause', () => {
@@ -732,8 +738,8 @@ function playIndex(i) {
 function playById(id) { const i = ordered().findIndex((c) => c.id === id); if (i >= 0) playIndex(i); }
 
 function markPlaying(on) {
-  document.querySelectorAll('.cp').forEach((r) => r.classList.remove('playing'));
-  if (on && curIdx >= 0) document.querySelector(`.cp[data-i="${curIdx}"]`)?.classList.add('playing');
+  document.querySelectorAll('.cp-card').forEach((r) => r.classList.remove('playing'));
+  if (on && curIdx >= 0) document.querySelector(`.cp-card[data-i="${curIdx}"]`)?.classList.add('playing');
 }
 function stopPlayer() {
   if (audio) { audio.pause(); audio.removeAttribute('src'); }
@@ -810,7 +816,7 @@ function syncMarkDoneBtn() {
   const done = completedSet.has(cp.id);
   btn.disabled = false;
   btn.textContent = done ? t('markCompletedUndo') : t('markCompleted');
-  btn.classList.toggle('good', done);
+  btn.classList.remove('good');
 }
 
 function resetTourProgress(id) {

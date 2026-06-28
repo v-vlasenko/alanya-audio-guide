@@ -25,7 +25,7 @@
   "completed": "Прослухано",
   "markCompleted": "Відмітити прослуханим",
   "markCompletedDone": "Прослухано",
-  "markCompletedUndo": "Зняти позначку",
+  "markCompletedUndo": "Скасувати «Прослухано»",
   "tourFullyCompleted": "✓ Тур пройдено",
   "gpsToggleLabel": "Геолокація",
   "gpsOn": "Підказувати за місцем",
