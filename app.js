@@ -297,23 +297,25 @@ async function renderTour(id) {
   promptedSet = new Set();
 
   app.innerHTML = `
-    <div class="topbar">
-      <button class="btn ghost sm" id="back">${esc(t('backToTours'))}</button>
-      <h2>${esc(tour.title)}</h2>
-    </div>
-    <details class="hints-fold">
-      <summary>${esc(t('hintsSummary'))}</summary>
-      <div class="hints-body">
-        ${tour.tip ? `<p>💡 ${esc(tour.tip)}</p>` : ''}
-        <p>${esc(t('gpsKeepOpenTip'))}</p>
+    <div class="tour-header">
+      <div class="topbar">
+        <button class="btn ghost sm" id="back">${esc(t('backToTours'))}</button>
+        <h2>${esc(tour.title)}</h2>
       </div>
-    </details>
-    <div class="tour-toolbar">
-      <button class="btn tour-start" id="start">${esc(t('startTour'))}</button>
-    </div>
-    <div class="tabs" role="tablist">
-      <button id="tab-list" role="tab" aria-selected="false">${esc(t('tabList'))}</button>
-      <button id="tab-map" role="tab" aria-selected="true">${esc(t('tabMap'))}</button>
+      <details class="hints-fold">
+        <summary>${esc(t('hintsSummary'))}</summary>
+        <div class="hints-body">
+          ${tour.tip ? `<p>💡 ${esc(tour.tip)}</p>` : ''}
+          <p>${esc(t('gpsKeepOpenTip'))}</p>
+        </div>
+      </details>
+      <div class="tour-toolbar">
+        <button class="btn tour-start" id="start">${esc(t('startTour'))}</button>
+      </div>
+      <div class="tabs" role="tablist">
+        <button id="tab-list" role="tab" aria-selected="false">${esc(t('tabList'))}</button>
+        <button id="tab-map" role="tab" aria-selected="true">${esc(t('tabMap'))}</button>
+      </div>
     </div>
     <section id="pane-list" hidden></section>
     <section id="pane-map"></section>
