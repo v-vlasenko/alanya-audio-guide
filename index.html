@@ -14,6 +14,20 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="lib/leaflet.css">
   <link rel="stylesheet" href="app.css">
+  <script>
+    (function () {
+      var standalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+      if (!standalone) return;
+      document.documentElement.classList.add('pwa');
+      var probe = document.createElement('div');
+      probe.style.cssText = 'position:fixed;top:0;left:0;height:env(safe-area-inset-top);width:0;pointer-events:none;visibility:hidden';
+      document.documentElement.appendChild(probe);
+      var inset = probe.getBoundingClientRect().height;
+      probe.remove();
+      if (inset < 20) inset = 52;
+      document.documentElement.style.setProperty('--safe-t', inset + 'px');
+    })();
+  </script>
 </head>
 <body>
   <!-- offline / online indicator -->
