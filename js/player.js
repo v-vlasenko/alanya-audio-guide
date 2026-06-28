@@ -3,7 +3,7 @@
 import { $, el, esc, fmtTime, haptic, toast } from './dom.js';
 import { t } from './i18n.js';
 import { state } from './state.js';
-import { INDEX, orderedCheckpoints, getCachedTour, audioCheckpointCount, isTourFullyCompleted } from './catalog.js';
+import { INDEX, orderedCheckpoints, getCachedTour } from './catalog.js';
 import { saveProgress } from './storage.js';
 import {
   PLAY_ICON, PAUSE_ICON, SKIP_BACK_ICON, SKIP_FWD_ICON,
@@ -332,15 +332,8 @@ export function buildPlayer() {
   });
   state.audio.addEventListener('ended', () => {
     state.maxListenedSec = Math.max(state.maxListenedSec, state.audio.duration || 0);
-    if (tryMarkCompleted(state.curIdx)) {
-      const pt = getPlayerTour();
-      const total = audioCheckpointCount(pt);
-      if (!isTourFullyCompleted(pt.id, total, state.completedSet) && state.curIdx < pt.checkpoints.length - 1) {
-        playIndex(state.curIdx + 1, { autoplay: true, tour: pt });
-      }
-    } else if (state.lastPos) {
-      checkProximity(state.lastPos.lat, state.lastPos.lng);
-    }
+    tryMarkCompleted(state.curIdx);
+    if (state.lastPos) checkProximity(state.lastPos.lat, state.lastPos.lng);
   });
   state.audio.addEventListener('error', () => { toast(t('errorAudioBody')); });
 
