@@ -454,6 +454,10 @@ function showNearbyCard(inRange) {
     });
   }
   card.hidden = false;
+  const p = $('#player');
+  if (p?.classList.contains('open')) {
+    setNearbyPlayerOffset(p.classList.contains('mini') ? 'mini' : 'full');
+  }
 }
 
 function checkProximity(lat, lng) {
@@ -632,17 +636,145 @@ let audio = null, curIdx = -1;
 let playSpeed = 1.0;
 let maxListenedSec = 0;
 const COMPLETE_RATIO = 0.95;
+const SKIP_SEC = 5;
+
+function ensurePlayerBackdrop() {
+  if ($('#player-backdrop')) return;
+  const bd = el('<div class="player-backdrop" id="player-backdrop" aria-hidden="true"></div>');
+  bd.onclick = () => {
+    const p = $('#player');
+    if (p?.classList.contains('open') && !p.classList.contains('mini') && !p.classList.contains('info-only')) {
+      minimizePlayer();
+    }
+  };
+  document.body.appendChild(bd);
+}
+
+function setPlayerBackdrop(on) {
+  ensurePlayerBackdrop();
+  $('#player-backdrop')?.classList.toggle('visible', !!on);
+}
+
+function setNearbyPlayerOffset(mode) {
+  const card = $('#nearby-card');
+  if (!card) return;
+  card.classList.remove('above-player', 'above-player-mini');
+  if (mode === 'full') card.classList.add('above-player');
+  else if (mode === 'mini') card.classList.add('above-player-mini');
+}
+
+function syncPlayerChrome() {
+  const dismiss = $('#p-dismiss');
+  const p = $('#player');
+  if (!dismiss || !p) return;
+  dismiss.setAttribute('aria-label', p.classList.contains('mini') ? t('close') : 'Згорнути');
+}
+
+function minimizePlayer() {
+  const p = $('#player');
+  if (!p?.classList.contains('open') || p.classList.contains('mini') || p.classList.contains('info-only')) return;
+  haptic(8);
+  p.classList.add('mini');
+  setPlayerBackdrop(false);
+  syncPlayerChrome();
+  if ($('#nearby-card') && !$('#nearby-card').hidden) setNearbyPlayerOffset('mini');
+}
+
+function expandPlayer() {
+  const p = $('#player');
+  if (!p?.classList.contains('open') || !p.classList.contains('mini')) return;
+  haptic(8);
+  p.classList.remove('mini');
+  syncPlayerChrome();
+  if (!p.classList.contains('info-only')) {
+    setPlayerBackdrop(true);
+    if ($('#nearby-card') && !$('#nearby-card').hidden) setNearbyPlayerOffset('full');
+  }
+}
+
+function skipAudio(deltaSec) {
+  if (!audio?.src) return;
+  const max = audio.duration || 0;
+  audio.currentTime = Math.max(0, Math.min(max, audio.currentTime + deltaSec));
+}
+
+let mediaSessionReady = false;
+
+function iconUrl(path) {
+  try { return new URL(path, location.href).href; } catch { return path; }
+}
+
+function updateMediaSession(cp) {
+  if (!('mediaSession' in navigator) || !cp?.audio) return;
+  const title = `${cp.order}. ${cp.shortTitle || cp.title}`;
+  const artist = activeTour?.title || INDEX?.appName || '';
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title,
+      artist,
+      album: INDEX?.appName || '',
+      artwork: [
+        { src: iconUrl('icons/apple-touch-icon.png'), sizes: '180x180', type: 'image/png' },
+        { src: iconUrl('icons/icon-192.png'), sizes: '192x192', type: 'image/png' },
+      ],
+    });
+  } catch {}
+}
+
+function updateMediaSessionPosition() {
+  if (!('mediaSession' in navigator) || !audio?.src) return;
+  const dur = audio.duration;
+  if (!dur || !Number.isFinite(dur)) return;
+  try {
+    navigator.mediaSession.setPositionState({
+      duration: dur,
+      playbackRate: audio.playbackRate || 1,
+      position: Math.min(audio.currentTime, dur),
+    });
+  } catch {}
+}
+
+function clearMediaSession() {
+  if (!('mediaSession' in navigator)) return;
+  try {
+    navigator.mediaSession.metadata = null;
+    navigator.mediaSession.playbackState = 'none';
+  } catch {}
+}
+
+function setupMediaSessionHandlers() {
+  if (mediaSessionReady || !('mediaSession' in navigator)) return;
+  mediaSessionReady = true;
+  const safe = (action, fn) => {
+    try { navigator.mediaSession.setActionHandler(action, fn); } catch {}
+  };
+  safe('play', () => { haptic(); audio?.play(); });
+  safe('pause', () => { haptic(); audio?.pause(); });
+  safe('previoustrack', () => { if (curIdx > 0) { haptic(); goTrack(curIdx - 1); } });
+  safe('nexttrack', () => {
+    if (activeTour && curIdx < activeTour.checkpoints.length - 1) { haptic(); goTrack(curIdx + 1); }
+  });
+  safe('seekbackward', (d) => { haptic(8); skipAudio(-(d?.seekOffset || SKIP_SEC)); });
+  safe('seekforward', (d) => { haptic(8); skipAudio(d?.seekOffset || SKIP_SEC); });
+}
 
 function buildPlayer() {
+  ensurePlayerBackdrop();
+  setupMediaSessionHandlers();
   const p = $('#player');
   p.innerHTML = `
-    <div class="pt"><span id="p-title"></span><button class="close" id="p-close">✕</button></div>
+    <div class="pt" id="p-head">
+      <span id="p-title"></span>
+      <button class="close" id="p-dismiss" type="button" aria-label="Згорнути">✕</button>
+    </div>
     <div class="seek">
       <span id="p-cur">0:00</span>
       <input type="range" id="p-seek" min="0" max="100" value="0" step="1">
       <div class="seek-end">
         <span id="p-dur">0:00</span>
-        <button class="p-speed" id="p-speed" type="button" title="Швидкість відтворення">1×</button>
+        <button class="p-ctl" id="p-speed" type="button" title="Швидкість відтворення">1×</button>
+        <button class="p-ctl" id="p-skip-back" type="button" title="−5 с">−5</button>
+        <button class="p-ctl" id="p-skip-fwd" type="button" title="+5 с">+5</button>
       </div>
     </div>
     <div class="pcontrols">
@@ -655,7 +787,11 @@ function buildPlayer() {
   `;
   audio = new Audio();
   audio.preload = 'metadata';
-  audio.addEventListener('loadedmetadata', () => { $('#p-dur').textContent = fmtTime(audio.duration); $('#p-seek').max = Math.floor(audio.duration) || 100; });
+  audio.addEventListener('loadedmetadata', () => {
+    $('#p-dur').textContent = fmtTime(audio.duration);
+    $('#p-seek').max = Math.floor(audio.duration) || 100;
+    updateMediaSessionPosition();
+  });
   audio.addEventListener('timeupdate', () => {
     const cur = $('#p-cur'); if (!cur) return;
     cur.textContent = fmtTime(audio.currentTime);
@@ -663,6 +799,7 @@ function buildPlayer() {
       $('#p-seek').value = Math.floor(audio.currentTime);
       if (audio.currentTime > maxListenedSec) maxListenedSec = audio.currentTime;
     }
+    updateMediaSessionPosition();
   });
   const setPlayBtn = (playing) => {
     const b = $('#p-play');
@@ -670,9 +807,13 @@ function buildPlayer() {
     b.innerHTML = playing ? PAUSE_ICON : PLAY_ICON;
     b.setAttribute('aria-label', playing ? t('pauseLabel') : t('playLabel'));
   };
-  audio.addEventListener('play', () => { setPlayBtn(true); markPlaying(true); });
+  audio.addEventListener('play', () => {
+    setPlayBtn(true); markPlaying(true);
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+  });
   audio.addEventListener('pause', () => {
     setPlayBtn(false); markPlaying(false);
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
     if (lastPos) checkProximity(lastPos.lat, lastPos.lng);
   });
   audio.addEventListener('ended', () => {
@@ -680,7 +821,7 @@ function buildPlayer() {
     if (tryMarkCompleted(curIdx)) {
       const total = audioCheckpointCount(activeTour);
       if (!isTourFullyCompleted(activeTour.id, total) && curIdx < activeTour.checkpoints.length - 1) {
-        playIndex(curIdx + 1);
+        playIndex(curIdx + 1, { autoplay: true });
       }
     } else if (lastPos) {
       checkProximity(lastPos.lat, lastPos.lng);
@@ -702,9 +843,19 @@ function buildPlayer() {
     haptic(8);
   };
   $('#p-play').onclick = () => { haptic(); audio.paused ? audio.play() : audio.pause(); };
-  $('#p-prev').onclick = () => { haptic(); if (curIdx > 0) playIndex(curIdx - 1); };
-  $('#p-next').onclick = () => { haptic(); if (curIdx < activeTour.checkpoints.length - 1) playIndex(curIdx + 1); };
-  $('#p-close').onclick = stopPlayer;
+  $('#p-prev').onclick = () => { haptic(); if (curIdx > 0) goTrack(curIdx - 1); };
+  $('#p-next').onclick = () => { haptic(); if (curIdx < activeTour.checkpoints.length - 1) goTrack(curIdx + 1); };
+  $('#p-skip-back').onclick = () => { haptic(8); skipAudio(-SKIP_SEC); };
+  $('#p-skip-fwd').onclick = () => { haptic(8); skipAudio(SKIP_SEC); };
+  $('#p-dismiss').onclick = () => {
+    haptic();
+    if ($('#player')?.classList.contains('mini')) stopPlayer();
+    else minimizePlayer();
+  };
+  $('#p-head').onclick = (e) => {
+    if (e.target.closest('#p-dismiss')) return;
+    if ($('#player')?.classList.contains('mini')) expandPlayer();
+  };
   $('#p-mark-done').onclick = () => {
     const cp = curIdx >= 0 ? ordered()[curIdx] : null;
     if (cp) toggleMarkCompleted(cp.id);
@@ -713,28 +864,64 @@ function buildPlayer() {
 
 const ordered = () => activeTour.checkpoints.slice().sort((a, b) => a.order - b.order);
 
-function playIndex(i) {
+function resetPlayerUi() {
+  const cur = $('#p-cur');
+  const seek = $('#p-seek');
+  const dur = $('#p-dur');
+  const btn = $('#p-play');
+  if (cur) cur.textContent = '0:00';
+  if (seek) seek.value = 0;
+  if (dur) dur.textContent = '0:00';
+  if (btn) {
+    btn.innerHTML = PLAY_ICON;
+    btn.setAttribute('aria-label', t('playLabel'));
+  }
+  markPlaying(false);
+}
+
+function playIndex(i, { autoplay = false } = {}) {
   const cp = ordered()[i];
   if (!cp) return;
   curIdx = i;
   maxListenedSec = 0;
+  resetPlayerUi();
   const hasAudio = !!cp.audio;
   if (hasAudio) {
     audio.src = activeTour.basePath + cp.audio;
     audio.playbackRate = playSpeed;
+    audio.currentTime = 0;
+    updateMediaSession(cp);
+    if (autoplay) audio.play().catch(() => {});
+    else audio.pause();
   } else {
     audio.pause();
     audio.removeAttribute('src');
+    clearMediaSession();
   }
   $('#player').classList.toggle('info-only', !hasAudio);
   saveProgress(activeTour.id, i);
   $('#p-title').textContent = `${cp.order}. ${cp.shortTitle || cp.title}`;
   $('#p-transcript').textContent = cp.transcript || '';
   $('#p-transcript').scrollTop = 0;
-  $('#player').classList.add('open');
+  const player = $('#player');
+  player.classList.remove('mini');
+  player.classList.add('open');
   syncMarkDoneBtn();
-  $('#nearby-card')?.classList.add('above-player');
+  if (hasAudio) {
+    setPlayerBackdrop(true);
+    setNearbyPlayerOffset($('#nearby-card') && !$('#nearby-card').hidden ? 'full' : null);
+  } else {
+    setPlayerBackdrop(false);
+    setNearbyPlayerOffset(null);
+  }
+  syncPlayerChrome();
 }
+
+function goTrack(idx) {
+  const wasPlaying = !!(audio?.src && !audio.paused);
+  playIndex(idx, { autoplay: wasPlaying });
+}
+
 function playById(id) { const i = ordered().findIndex((c) => c.id === id); if (i >= 0) playIndex(i); }
 
 function markPlaying(on) {
@@ -744,8 +931,12 @@ function markPlaying(on) {
 function stopPlayer() {
   if (audio) { audio.pause(); audio.removeAttribute('src'); }
   curIdx = -1;
-  $('#player')?.classList.remove('open');
-  $('#nearby-card')?.classList.remove('above-player');
+  clearMediaSession();
+  const p = $('#player');
+  p?.classList.remove('open', 'mini', 'info-only');
+  setPlayerBackdrop(false);
+  setNearbyPlayerOffset(null);
+  syncPlayerChrome();
   if (lastPos) checkProximity(lastPos.lat, lastPos.lng);
 }
 
