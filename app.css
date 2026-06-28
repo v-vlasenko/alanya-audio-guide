@@ -16,6 +16,8 @@ body{
   min-height:100%; max-width:480px; margin:0 auto;
   padding:12px var(--pad) calc(var(--safe-b) + 24px);
 }
+body.player-open #app{padding-bottom:calc(var(--safe-b) + 168px)}
+body.player-open.player-mini #app{padding-bottom:calc(var(--safe-b) + 168px)}
 h1,h2,h3{margin:0 0 .3em; line-height:1.2}
 h1{font-size:28px} h2{font-size:22px}
 p{margin:.2em 0 .6em}
@@ -176,18 +178,11 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
   transition:transform .25s; box-shadow:0 -6px 24px rgba(0,0,0,.4);
 }
 .player.open{transform:translateX(-50%) translateY(0)}
-.player.mini{padding:8px var(--pad) calc(var(--safe-b) + 8px)}
-.player.mini .pcontrols .p-nav,
+.player.mini{padding:10px var(--pad) calc(var(--safe-b) + 10px)}
 .player.mini .p-mark-row,
 .player.mini .transcript{display:none}
-.player.mini .pcontrols{
-  display:flex; justify-content:center; gap:14px; margin:8px 0 0;
-}
-.player.mini .p-play-btn{width:52px; height:52px}
-.player.mini .p-play-btn .p-play-icon{width:26px; height:26px}
-.player.mini .p-skip{width:44px; height:44px}
-.player.mini .p-skip .p-ico{width:26px; height:26px}
-.player.mini .pt{cursor:pointer; margin-bottom:2px}
+.player.mini .pt{cursor:pointer; margin-bottom:4px}
+.player.mini .pcontrols{margin:10px 0 4px}
 .player .pt{font-weight:800; font-size:17px; margin-bottom:6px; display:flex; gap:8px; align-items:center}
 .player.mini .pt{font-size:15px}
 .player .pt .close{margin-left:auto; color:var(--muted); font-size:22px; width:32px; flex-shrink:0}
@@ -257,7 +252,7 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
   padding:14px var(--pad); box-shadow:0 -4px 24px rgba(0,0,0,.45);
 }
 .nearby-card.above-player{bottom:calc(var(--safe-b) + 280px)}
-.nearby-card.above-player-mini{bottom:calc(var(--safe-b) + 148px)}
+.nearby-card.above-player-mini{bottom:calc(var(--safe-b) + 200px)}
 .nearby-card .nearby-x{position:absolute; top:10px; right:12px; background:none; border:none;
   color:var(--muted); font-size:20px; width:32px; height:32px}
 .nearby-msg{margin:0 28px 10px 0; font-size:16px; line-height:1.35}

@@ -127,17 +127,34 @@ function detectWebview() {
 }
 
 /* ---------- router ---------- */
+let playingTourId = null;
+
+function isPlayerOpen() {
+  const p = $('#player');
+  return !!(p?.classList.contains('open'));
+}
+
 function route() {
-  stopPlayer();
+  const m = location.hash.match(/^#\/tour\/([\w-]+)/);
+  const nextTourId = m?.[1] ?? null;
+  const playerOpen = isPlayerOpen();
+
   teardownMap();
   hideNearbyCard();
   promptedSet = new Set();
-  const m = location.hash.match(/^#\/tour\/([\w-]+)/);
-  if (m) renderTour(m[1]); else renderHome();
+
+  if (nextTourId) {
+    if (playerOpen && playingTourId && playingTourId !== nextTourId) stopPlayer();
+    renderTour(nextTourId);
+  } else {
+    renderHome();
+    if (playerOpen) persistPlayerOnHome();
+  }
 }
 
 /* ================= HOME / PICKER ================= */
 function renderHome() {
+  if (!isPlayerOpen()) activeTour = null;
   const standalone = window.navigator.standalone || matchMedia('(display-mode: standalone)').matches;
   app.innerHTML = `
     <header class="home-head">
@@ -312,7 +329,6 @@ async function renderTour(id) {
     <section id="pane-list" hidden></section>
     <section id="pane-map"></section>
     <div class="nearby-card" id="nearby-card" hidden></div>
-    <div class="player" id="player"></div>
   `;
   $('#back').onclick = () => { location.hash = '#/'; };
   const savedIdx = loadProgress(id);
@@ -328,6 +344,12 @@ async function renderTour(id) {
   buildPlayer();
   renderList();
   renderMap();
+  if (sessionStorage.getItem('expand-player')) {
+    sessionStorage.removeItem('expand-player');
+    if (isPlayerOpen()) expandPlayer();
+  } else if (curIdx >= 0 && audio && !audio.paused) {
+    markPlaying(true);
+  }
 }
 
 function switchTab(which) {
@@ -679,7 +701,16 @@ function syncPlayerChrome() {
   const dismiss = $('#p-dismiss');
   const p = $('#player');
   if (!dismiss || !p) return;
-  dismiss.setAttribute('aria-label', p.classList.contains('mini') ? t('close') : 'Згорнути');
+  dismiss.setAttribute('aria-label', t('close'));
+  document.body.classList.toggle('player-open', p.classList.contains('open'));
+  document.body.classList.toggle('player-mini', p.classList.contains('mini'));
+}
+
+function persistPlayerOnHome() {
+  const p = $('#player');
+  if (!p?.classList.contains('open')) return;
+  if (!p.classList.contains('mini') && !p.classList.contains('info-only')) minimizePlayer();
+  else syncPlayerChrome();
 }
 
 function minimizePlayer() {
@@ -770,14 +801,24 @@ function setupMediaSessionHandlers() {
   safe('seekforward', (d) => { haptic(8); skipAudio(d?.seekOffset || SKIP_SEC); });
 }
 
+function ensurePlayerShell() {
+  if ($('#player')) return;
+  document.body.appendChild(el('<div class="player" id="player"></div>'));
+}
+
+let playerReady = false;
+
 function buildPlayer() {
+  ensurePlayerShell();
   ensurePlayerBackdrop();
   setupMediaSessionHandlers();
+  if (playerReady) return;
+  playerReady = true;
   const p = $('#player');
   p.innerHTML = `
     <div class="pt" id="p-head">
       <span id="p-title"></span>
-      <button class="close" id="p-dismiss" type="button" aria-label="Згорнути">✕</button>
+      <button class="close" id="p-dismiss" type="button" aria-label="${esc(t('close'))}">✕</button>
     </div>
     <div class="seek">
       <span id="p-cur">0:00</span>
@@ -857,14 +898,17 @@ function buildPlayer() {
   $('#p-next').onclick = () => { haptic(); if (curIdx < activeTour.checkpoints.length - 1) goTrack(curIdx + 1); };
   $('#p-skip-back').onclick = () => { haptic(8); skipAudio(-SKIP_SEC); };
   $('#p-skip-fwd').onclick = () => { haptic(8); skipAudio(SKIP_SEC); };
-  $('#p-dismiss').onclick = () => {
-    haptic();
-    if ($('#player')?.classList.contains('mini')) stopPlayer();
-    else minimizePlayer();
-  };
+  $('#p-dismiss').onclick = () => { haptic(); stopPlayer(); };
   $('#p-head').onclick = (e) => {
     if (e.target.closest('#p-dismiss')) return;
-    if ($('#player')?.classList.contains('mini')) expandPlayer();
+    const p = $('#player');
+    if (!p?.classList.contains('mini')) return;
+    if (!location.hash.match(/^#\/tour\//) && playingTourId) {
+      sessionStorage.setItem('expand-player', '1');
+      location.hash = `#/tour/${playingTourId}`;
+      return;
+    }
+    expandPlayer();
   };
   $('#p-mark-done').onclick = () => {
     const cp = curIdx >= 0 ? ordered()[curIdx] : null;
@@ -903,6 +947,7 @@ function playIndex(i, { autoplay = false } = {}) {
   const cp = ordered()[i];
   if (!cp) return;
   curIdx = i;
+  playingTourId = activeTour.id;
   maxListenedSec = 0;
   resetPlayerUi();
   const hasAudio = !!cp.audio;
@@ -951,6 +996,7 @@ function markPlaying(on) {
 function stopPlayer() {
   if (audio) { audio.pause(); audio.removeAttribute('src'); }
   curIdx = -1;
+  playingTourId = null;
   clearMediaSession();
   const p = $('#player');
   p?.classList.remove('open', 'mini', 'info-only');

@@ -4,7 +4,7 @@
    page (tour-<id>-<version>); this SW just serves whatever is cached. */
 'use strict';
 
-const SHELL = 'shell-v13';
+const SHELL = 'shell-v17';
 const SHELL_ASSETS = [
   './', 'index.html', 'app.css', 'app.js', 'manifest.json',
   'lib/leaflet.js', 'lib/leaflet.css',
