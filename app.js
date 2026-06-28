@@ -26,6 +26,20 @@ const MARK_ICON = {
 
 const PLAY_ICON = '<svg class="p-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>';
 const PAUSE_ICON = '<svg class="p-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/></svg>';
+const SKIP_BACK_ICON = `<svg class="p-ico" viewBox="0 0 40 40" aria-hidden="true">
+  <path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+    d="M28 16a12 12 0 1 0-10.5 20"/>
+  <path fill="currentColor" d="M28 16l4.2 1.2-2.8 3.4z"/>
+  <text x="20" y="21" text-anchor="middle" font-size="10" font-weight="700" fill="currentColor">5</text>
+</svg>`;
+const SKIP_FWD_ICON = `<svg class="p-ico" viewBox="0 0 40 40" aria-hidden="true">
+  <path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+    d="M12 16a12 12 0 1 1 10.5 20"/>
+  <path fill="currentColor" d="M12 16l-4.2 1.2 2.8 3.4z"/>
+  <text x="20" y="21" text-anchor="middle" font-size="10" font-weight="700" fill="currentColor">5</text>
+</svg>`;
+const PREV_TRACK_ICON = '<svg class="p-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 6h2v12H6V6zm4.5 6l8.5 6V6l-8.5 6z"/></svg>';
+const NEXT_TRACK_ICON = '<svg class="p-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"/></svg>';
 
 const EARTH_R = 6371000;
 function haversineM(lat1, lng1, lat2, lng2) {
@@ -277,25 +291,23 @@ async function renderTour(id) {
   promptedSet = new Set();
 
   app.innerHTML = `
-    <div class="tour-header">
-      <div class="tour-back-bar">
-        <button class="btn ghost sm tour-back" id="back">${esc(t('backToTours'))}</button>
+    <div class="topbar">
+      <button class="btn ghost sm" id="back">${esc(t('backToTours'))}</button>
+      <h2>${esc(tour.title)}</h2>
+    </div>
+    <details class="hints-fold">
+      <summary>${esc(t('hintsSummary'))}</summary>
+      <div class="hints-body">
+        ${tour.tip ? `<p>💡 ${esc(tour.tip)}</p>` : ''}
+        <p>${esc(t('gpsKeepOpenTip'))}</p>
       </div>
-      <h2 class="tour-title">${esc(tour.title)}</h2>
-      <details class="hints-fold">
-        <summary>${esc(t('hintsSummary'))}</summary>
-        <div class="hints-body">
-          ${tour.tip ? `<p>💡 ${esc(tour.tip)}</p>` : ''}
-          <p>${esc(t('gpsKeepOpenTip'))}</p>
-        </div>
-      </details>
-      <div class="tour-toolbar">
-        <button class="btn tour-start" id="start">${esc(t('startTour'))}</button>
-      </div>
-      <div class="tabs" role="tablist">
-        <button id="tab-list" role="tab" aria-selected="false">${esc(t('tabList'))}</button>
-        <button id="tab-map" role="tab" aria-selected="true">${esc(t('tabMap'))}</button>
-      </div>
+    </details>
+    <div class="tour-toolbar">
+      <button class="btn tour-start" id="start">${esc(t('startTour'))}</button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button id="tab-list" role="tab" aria-selected="false">${esc(t('tabList'))}</button>
+      <button id="tab-map" role="tab" aria-selected="true">${esc(t('tabMap'))}</button>
     </div>
     <section id="pane-list" hidden></section>
     <section id="pane-map"></section>
@@ -770,17 +782,15 @@ function buildPlayer() {
     <div class="seek">
       <span id="p-cur">0:00</span>
       <input type="range" id="p-seek" min="0" max="100" value="0" step="1">
-      <div class="seek-end">
-        <span id="p-dur">0:00</span>
-        <button class="p-ctl" id="p-speed" type="button" title="Швидкість відтворення">1×</button>
-        <button class="p-ctl" id="p-skip-back" type="button" title="−5 с">−5</button>
-        <button class="p-ctl" id="p-skip-fwd" type="button" title="+5 с">+5</button>
-      </div>
+      <span id="p-dur">0:00</span>
+      <button class="p-icon-btn p-speed-btn" id="p-speed" type="button" title="Швидкість відтворення">1×</button>
     </div>
     <div class="pcontrols">
-      <button class="btn secondary p-nav" id="p-prev" type="button">${esc(t('previous'))}</button>
-      <button class="btn p-play-btn" id="p-play" type="button" aria-label="${esc(t('playLabel'))}">${PLAY_ICON}</button>
-      <button class="btn secondary p-nav" id="p-next" type="button">${esc(t('next'))}</button>
+      <button class="p-icon-btn p-nav" id="p-prev" type="button" aria-label="${esc(t('previous'))}">${PREV_TRACK_ICON}</button>
+      <button class="p-icon-btn p-skip" id="p-skip-back" type="button" aria-label="−5 с">${SKIP_BACK_ICON}</button>
+      <button class="p-icon-btn p-play-btn" id="p-play" type="button" aria-label="${esc(t('playLabel'))}">${PLAY_ICON}</button>
+      <button class="p-icon-btn p-skip" id="p-skip-fwd" type="button" aria-label="+5 с">${SKIP_FWD_ICON}</button>
+      <button class="p-icon-btn p-nav" id="p-next" type="button" aria-label="${esc(t('next'))}">${NEXT_TRACK_ICON}</button>
     </div>
     <div class="p-mark-row" id="p-mark-row"><button class="btn ghost sm" id="p-mark-done">${esc(t('markCompleted'))}</button></div>
     <div class="transcript" id="p-transcript"></div>
@@ -860,9 +870,18 @@ function buildPlayer() {
     const cp = curIdx >= 0 ? ordered()[curIdx] : null;
     if (cp) toggleMarkCompleted(cp.id);
   };
+  syncNavButtons();
 }
 
 const ordered = () => activeTour.checkpoints.slice().sort((a, b) => a.order - b.order);
+
+function syncNavButtons() {
+  const prev = $('#p-prev');
+  const next = $('#p-next');
+  if (!prev || !next || !activeTour) return;
+  prev.disabled = curIdx <= 0;
+  next.disabled = curIdx < 0 || curIdx >= activeTour.checkpoints.length - 1;
+}
 
 function resetPlayerUi() {
   const cur = $('#p-cur');
@@ -877,6 +896,7 @@ function resetPlayerUi() {
     btn.setAttribute('aria-label', t('playLabel'));
   }
   markPlaying(false);
+  syncNavButtons();
 }
 
 function playIndex(i, { autoplay = false } = {}) {
