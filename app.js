@@ -26,18 +26,10 @@ const MARK_ICON = {
 
 const PLAY_ICON = '<svg class="p-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>';
 const PAUSE_ICON = '<svg class="p-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/></svg>';
-const SKIP_BACK_ICON = `<svg class="p-ico" viewBox="0 0 40 40" aria-hidden="true">
-  <path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
-    d="M28 16a12 12 0 1 0-10.5 20"/>
-  <path fill="currentColor" d="M28 16l4.2 1.2-2.8 3.4z"/>
-  <text x="20" y="21" text-anchor="middle" font-size="10" font-weight="700" fill="currentColor">5</text>
-</svg>`;
-const SKIP_FWD_ICON = `<svg class="p-ico" viewBox="0 0 40 40" aria-hidden="true">
-  <path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
-    d="M12 16a12 12 0 1 1 10.5 20"/>
-  <path fill="currentColor" d="M12 16l-4.2 1.2 2.8 3.4z"/>
-  <text x="20" y="21" text-anchor="middle" font-size="10" font-weight="700" fill="currentColor">5</text>
-</svg>`;
+const REPLAY_ICON = '<svg class="p-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>';
+const FORWARD_ICON = '<svg class="p-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5v-4l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/></svg>';
+const SKIP_BACK_ICON = `<span class="skip-inner">${REPLAY_ICON}<span class="skip-num">5</span></span>`;
+const SKIP_FWD_ICON = `<span class="skip-inner skip-fwd"><span class="skip-num">5</span>${FORWARD_ICON}</span>`;
 const PREV_TRACK_ICON = '<svg class="p-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 6h2v12H6V6zm4.5 6l8.5 6V6l-8.5 6z"/></svg>';
 const NEXT_TRACK_ICON = '<svg class="p-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"/></svg>';
 
@@ -807,14 +799,16 @@ function ensurePlayerShell() {
 }
 
 let playerReady = false;
+const PLAYER_UI_VER = 6;
 
 function buildPlayer() {
   ensurePlayerShell();
   ensurePlayerBackdrop();
   setupMediaSessionHandlers();
   const p = $('#player');
-  if (playerReady) return;
+  if (playerReady && p?.dataset.uiVer === String(PLAYER_UI_VER)) return;
   playerReady = true;
+  if (p) p.dataset.uiVer = String(PLAYER_UI_VER);
   p.innerHTML = `
     <div class="pt" id="p-head">
       <span id="p-title"></span>
