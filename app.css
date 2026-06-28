@@ -2,9 +2,7 @@
   --bg:#1c1410; --bg2:#271c16; --card:#2f221b; --line:#43332a;
   --fg:#fbf3ec; --muted:#c7b3a6; --accent:#e2703e; --accent2:#c75b39;
   --good:#4caf6a; --tap:64px; --pad:16px; --r:16px;
-  --safe-t:0px; --safe-b:0px;
-  --safe-t:constant(safe-area-inset-top,0px); --safe-b:constant(safe-area-inset-bottom,0px);
-  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
@@ -16,13 +14,7 @@ body{
 }
 #app{
   min-height:100%; max-width:480px; margin:0 auto;
-  padding-top:calc(env(safe-area-inset-top, 0px) + 8px);
-  padding-right:var(--pad); padding-left:var(--pad);
-  padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 24px);
-}
-html.pwa #app{
-  /* black status bar in standalone — env() is often 0; keep a modest top pad only */
-  padding-top:8px;
+  padding:12px var(--pad) calc(var(--safe-b) + 24px);
 }
 h1,h2,h3{margin:0 0 .3em; line-height:1.2}
 h1{font-size:28px} h2{font-size:22px}
@@ -47,10 +39,8 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 /* ---- net indicator ---- */
 .net{
   position:fixed; left:0; right:0; top:0; z-index:1200; text-align:center;
-  font-size:14px; font-weight:700;
-  padding:calc(env(safe-area-inset-top, 0px) + 6px) 8px 6px;
+  font-size:14px; font-weight:700; padding:8px;
 }
-html.pwa .net{padding-top:calc(env(safe-area-inset-top, 0px) + 6px)}
 .net.off{background:#3a2a12; color:#ffd28a}
 .net.on{background:#10301c; color:#9ff0b8}
 
@@ -85,19 +75,16 @@ html.pwa .net{padding-top:calc(env(safe-area-inset-top, 0px) + 6px)}
 .tour-card.is-complete{border-color:#3d9a5f66}
 
 /* ---- tour view ---- */
-.tour-header{
-  position:sticky; z-index:50;
-  top:calc(var(--net-h, 0px) + env(safe-area-inset-top, 0px));
-  margin:0 calc(-1 * var(--pad)) 10px; padding:0 var(--pad) 4px;
-  background:var(--bg);
-  box-shadow:0 1px 0 var(--line);
-}
-html.pwa .tour-header{top:var(--net-h, 0px)}
+.tour-header{margin-bottom:10px}
 .topbar{
   display:flex; align-items:center; gap:10px;
-  padding:4px 0 8px;
+  padding:4px 0 10px;
 }
-.topbar h2{flex:1; font-size:18px; margin:0}
+.topbar .btn{flex-shrink:0}
+.topbar h2{
+  flex:1; min-width:0; font-size:18px; margin:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
 .tabs{display:flex; gap:8px; margin:0 0 10px}
 .tabs button{flex:1; min-height:44px; border-radius:12px; background:var(--card);
   border:1px solid var(--line); font-weight:700; font-size:16px; color:var(--muted)}
@@ -225,7 +212,7 @@ html.pwa .tour-header{top:var(--net-h, 0px)}
 .sheet{background:var(--bg2); border-radius:20px 20px 0 0; padding:20px var(--pad) calc(var(--safe-b) + 24px);
   width:100%; border-top:1px solid var(--line)}
 .sheet ol{padding-left:20px; line-height:1.6}
-.webview-warn{position:fixed; left:8px; right:8px; top:calc(var(--safe-t) + 8px); z-index:1300;
+.webview-warn{position:fixed; left:8px; right:8px; top:12px; z-index:1300;
   background:#4a1f12; color:#ffd9c2; border:1px solid #7a3b22; border-radius:12px; padding:12px 14px; font-size:15px}
 
 .install-hint{margin-top:18px; text-align:center}

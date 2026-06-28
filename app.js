@@ -44,26 +44,7 @@ const lat2y = (lat, z) => {
 };
 
 /* ---------- boot ---------- */
-function fixStandaloneSafeArea() {
-  const standalone = window.navigator.standalone || matchMedia('(display-mode: standalone)').matches;
-  if (!standalone) return;
-  document.documentElement.classList.add('pwa');
-  let inset = window.visualViewport?.offsetTop || 0;
-  if (inset < 20) {
-    const probe = document.createElement('div');
-    probe.style.cssText = 'position:fixed;top:0;left:0;height:env(safe-area-inset-top);width:0;pointer-events:none;visibility:hidden';
-    document.body.appendChild(probe);
-    inset = probe.getBoundingClientRect().height;
-    probe.remove();
-  }
-  if (inset < 20) inset = 52;
-  document.documentElement.style.setProperty('--safe-t', `${inset}px`);
-}
-
 async function boot() {
-  fixStandaloneSafeArea();
-  window.addEventListener('resize', fixStandaloneSafeArea, { passive: true });
-  window.visualViewport?.addEventListener('resize', fixStandaloneSafeArea, { passive: true });
   try {
     [STR, INDEX] = await Promise.all([
       fetch('data/ui-strings-uk.json').then((r) => r.json()),
@@ -74,7 +55,6 @@ async function boot() {
     return;
   }
   document.title = INDEX.appName || document.title;
-  fixStandaloneSafeArea();
   initNet();
   detectWebview();
   registerSW();
