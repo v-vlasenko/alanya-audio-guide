@@ -64,7 +64,6 @@ async function boot() {
   initNet();
   detectWebview();
   registerSW();
-  initResumeRoute();
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   window.addEventListener('hashchange', route);
   route();
@@ -83,7 +82,6 @@ function registerSW() {
 
 async function hardRefresh() {
   try {
-    clearResumeRoute();
     const keys = await caches.keys();
     await Promise.all(keys.map((k) => caches.delete(k)));
     const regs = await navigator.serviceWorker.getRegistrations();
@@ -119,32 +117,6 @@ function detectWebview() {
   if (inApp && !isStandalone) {
     const w = $('#webview-warn'); w.textContent = t('openInSafariWarning'); w.hidden = false;
   }
-}
-
-function syncResumeRoute() {
-  if (playingTourId && isPlayerOpen() && audio?.src) {
-    localStorage.setItem('resume-route', `#/tour/${playingTourId}`);
-  }
-}
-
-function clearResumeRoute() {
-  localStorage.removeItem('resume-route');
-}
-
-function maybeRestoreRoute() {
-  const cur = location.hash;
-  if (cur && cur !== '#/' && cur !== '') return;
-  const saved = localStorage.getItem('resume-route');
-  if (saved?.match(/^#\/tour\/[\w-]+$/)) location.hash = saved;
-}
-
-function initResumeRoute() {
-  maybeRestoreRoute();
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible' || !playingTourId || !audio?.src) return;
-    const want = `#/tour/${playingTourId}`;
-    if (location.hash !== want) location.hash = want;
-  });
 }
 
 /* ---------- router ---------- */
@@ -351,9 +323,6 @@ async function renderTour(id) {
         <p>${esc(t('gpsKeepOpenTip'))}</p>
       </div>
     </details>
-    <div class="tour-toolbar">
-      <button class="btn tour-start" id="start">${esc(t('startTour'))}</button>
-    </div>
     <div class="tabs" role="tablist">
       <button id="tab-list" role="tab" aria-selected="false">${esc(t('tabList'))}</button>
       <button id="tab-map" role="tab" aria-selected="true">${esc(t('tabMap'))}</button>
@@ -363,23 +332,12 @@ async function renderTour(id) {
     <div class="nearby-card" id="nearby-card" hidden></div>
   `;
   $('#back').onclick = () => { location.hash = '#/'; };
-  const savedIdx = loadProgress(id);
-  if (savedIdx >= 0 && savedIdx < tour.checkpoints.length) {
-    const cp = ordered()[savedIdx];
-    if (cp) $('#start').textContent = `▶ ${cp.shortTitle || cp.title}`;
-    $('#start').onclick = () => { haptic(); playIndex(savedIdx); };
-  } else {
-    $('#start').onclick = () => { haptic(); playIndex(0); };
-  }
   $('#tab-list').onclick = () => switchTab('list');
   $('#tab-map').onclick = () => switchTab('map');
   buildPlayer();
   renderList();
   renderMap();
-  if (sessionStorage.getItem('expand-player')) {
-    sessionStorage.removeItem('expand-player');
-    if (isPlayerOpen()) expandPlayer();
-  } else if (curIdx >= 0 && audio && !audio.paused && playingTourId === id) {
+  if (curIdx >= 0 && audio && !audio.paused && playingTourId === id) {
     markPlaying(true);
   }
   if (isPlayerOpen()) {
@@ -952,14 +910,7 @@ function buildPlayer() {
   $('#p-dismiss').onclick = () => { haptic(); stopPlayer(); };
   $('#p-head').onclick = (e) => {
     if (e.target.closest('#p-dismiss')) return;
-    const p = $('#player');
-    if (!p?.classList.contains('mini')) return;
-    if (!location.hash.match(/^#\/tour\//) && playingTourId) {
-      sessionStorage.setItem('expand-player', '1');
-      location.hash = `#/tour/${playingTourId}`;
-      return;
-    }
-    expandPlayer();
+    if ($('#player')?.classList.contains('mini')) expandPlayer();
   };
   $('#p-mark-done').onclick = () => {
     const cp = curIdx >= 0 ? playerOrdered()[curIdx] : null;
@@ -1047,7 +998,6 @@ function playIndex(i, { autoplay = false, tour = null } = {}) {
     setNearbyPlayerOffset(null);
   }
   syncPlayerChrome();
-  syncResumeRoute();
 }
 
 function goTrack(idx) {
@@ -1076,7 +1026,6 @@ function stopPlayer() {
   setPlayerBackdrop(false);
   setNearbyPlayerOffset(null);
   syncPlayerChrome();
-  clearResumeRoute();
   if (lastPos) checkProximity(lastPos.lat, lastPos.lng);
 }
 

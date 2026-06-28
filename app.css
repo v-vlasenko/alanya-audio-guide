@@ -91,8 +91,6 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .hints-fold .hints-body{padding:10px 14px; font-size:14px; line-height:1.4; color:#a8c4d8}
 .hints-fold .hints-body p{margin:0 0 8px}
 .hints-fold .hints-body p:last-child{margin:0}
-.tour-toolbar{display:flex; gap:8px; align-items:stretch; margin-bottom:8px}
-.tour-toolbar .tour-start{flex:1; min-height:48px; font-size:17px; padding:0 14px}
 
 /* ---- checkpoint list ---- */
 .cp-list{display:flex; flex-direction:column; gap:10px}
