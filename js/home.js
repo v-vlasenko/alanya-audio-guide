@@ -8,7 +8,7 @@ import {
 } from './catalog.js';
 import {
   cacheName, putCachedUrl, deleteTourDownload, deleteStaleTourCaches,
-  tourDownloadState, isCriticalTourAsset, isOptionalTourAsset,
+  tourDownloadState, isCriticalTourAsset, isOptionalTourAsset, downloadWeight,
 } from './cache.js';
 import { markTourDownloaded, loadCompleted } from './storage.js';
 import { isPlayerOpen } from './player.js';
@@ -107,9 +107,15 @@ async function wireDownload(tr, card) {
     try {
       const urls = await tourAssetUrls(tr, loadTour);
       const cache = await caches.open(cn);
-      let done = 0;
+      const weights = urls.map((u) => downloadWeight(u, tr.path, tr.cover));
+      const totalWeight = weights.reduce((sum, w) => sum + w, 0) || 1;
+      let doneWeight = 0;
       let criticalFailed = 0;
-      for (const u of urls) {
+      const setProgress = () => {
+        bar.style.width = `${Math.min(100, Math.round((doneWeight / totalWeight) * 100))}%`;
+      };
+      for (let i = 0; i < urls.length; i++) {
+        const u = urls[i];
         try {
           const res = await fetch(u, { cache: 'reload' });
           if (res.ok) {
@@ -120,8 +126,8 @@ async function wireDownload(tr, card) {
         } catch {
           if (!isOptionalTourAsset(u, tr.cover) && isCriticalTourAsset(u, tr.path)) criticalFailed++;
         }
-        done++;
-        bar.style.width = `${Math.round((done / urls.length) * 100)}%`;
+        doneWeight += weights[i];
+        setProgress();
       }
       if (criticalFailed > 0) {
         await caches.delete(cn);

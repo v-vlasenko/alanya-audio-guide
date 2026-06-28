@@ -150,3 +150,12 @@ export function isCriticalTourAsset(url, tourPath) {
 export function isOptionalTourAsset(url, coverPath) {
   return url === coverPath;
 }
+
+/** Relative byte weight for download progress (file-count skews bar when many tiles). */
+export function downloadWeight(url, tourPath, coverPath) {
+  if (url.endsWith('.mp3')) return 1000;
+  if (url === coverPath || url.endsWith('.jpg') || url.endsWith('.jpeg')) return 300;
+  if (url.includes('/tiles/') && url.endsWith('.png')) return 8;
+  if (url === tourPath || url.endsWith('.json')) return 2;
+  return 10;
+}

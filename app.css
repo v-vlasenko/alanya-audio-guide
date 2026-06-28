@@ -60,7 +60,7 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .card-actions .btn{width:100%}
 .dl-state{font-size:14px; margin-top:10px}
 .dl-bar{height:8px; border-radius:4px; background:var(--line); overflow:hidden; margin-top:8px}
-.dl-bar>i{display:block; height:100%; width:0; background:var(--accent); transition:width .2s}
+.dl-bar>i{display:block; height:100%; width:0; background:var(--accent); transition:width .08s linear}
 .best-time{color:#ffd28a; font-size:14px; margin-top:6px}
 .tour-done-badge{
   display:inline-block; margin-top:8px; padding:6px 12px; border-radius:999px;
