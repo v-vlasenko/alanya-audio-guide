@@ -4,6 +4,7 @@ import { $, esc, app, resetPageScroll } from './dom.js';
 import { t } from './i18n.js';
 import { state } from './state.js';
 import { INDEX, loadTour } from './catalog.js';
+import { tourDownloadState } from './cache.js';
 import { loadCompleted } from './storage.js';
 import { renderHome } from './home.js';
 import { renderList, switchTab, applySavedProgressHighlight } from './tour-list.js';
@@ -23,7 +24,11 @@ export async function renderTour(id) {
   let tour;
   try { tour = await loadTour(id); }
   catch {
-    app.innerHTML = `<p>${esc(t('notDownloadedHint'))}</p><button class="btn" id="tour-back">${esc(t('backToTours'))}</button>`;
+    const dl = await tourDownloadState(id, meta.path, meta.version);
+    const hint = dl === 'stale' ? t('tourUpdateAvailable')
+      : dl === 'evicted' ? t('tourReDownloadHint')
+        : t('notDownloadedHint');
+    app.innerHTML = `<p>${esc(hint)}</p><button class="btn" id="tour-back">${esc(t('backToTours'))}</button>`;
     $('#tour-back').onclick = () => { location.hash = '#/'; };
     return;
   }

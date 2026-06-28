@@ -7,13 +7,13 @@ import {
   INDEX, loadTour, tourAssetUrls, tourCheckpointTotal, isTourFullyCompleted,
 } from './catalog.js';
 import {
-  cacheName, putCachedUrl, readTourJsonFromCaches, findTourDownloadCache,
-  deleteTourDownload, deleteStaleTourCaches,
+  cacheName, putCachedUrl, deleteTourDownload, deleteStaleTourCaches,
+  tourDownloadState, isCriticalTourAsset, isOptionalTourAsset,
 } from './cache.js';
 import { markTourDownloaded, loadCompleted } from './storage.js';
 import { isPlayerOpen } from './player.js';
 import { showInstallSheet } from './install.js';
-import { hardRefresh } from './sw-register.js';
+import { hardRefresh, tryActivateDeferredSw } from './sw-register.js';
 
 function isTourFullyCompletedForCard(id, total) {
   return isTourFullyCompleted(id, total, loadCompleted(id));
@@ -57,51 +57,97 @@ async function wireDownload(tr, card) {
   const stateEl = $('.dl-state', card);
   const cn = cacheName(tr.id, tr.version);
 
-  async function isDownloaded() {
-    if (await readTourJsonFromCaches(tr.id)) return true;
-    return !!(await findTourDownloadCache(tr.id, tr.path));
-  }
   function setDone() {
-    btn.textContent = t('tourDownloaded'); btn.classList.add('good'); btn.classList.remove('secondary');
+    btn.textContent = t('tourDownloaded');
+    btn.classList.add('good');
+    btn.classList.remove('secondary', 'warn');
     btn.disabled = true;
     stateEl.innerHTML = `<button class="btn ghost sm del">${esc(t('deleteTourDownload'))}</button>`;
     $('.del', stateEl).onclick = async () => { await deleteTourDownload(tr.id); refresh(); };
   }
+
   function setIdle() {
-    btn.textContent = t('downloadTour'); btn.disabled = false;
-    btn.classList.add('secondary'); btn.classList.remove('good');
+    btn.textContent = t('downloadTour');
+    btn.disabled = false;
+    btn.classList.add('secondary');
+    btn.classList.remove('good', 'warn');
     stateEl.innerHTML = '';
   }
-  async function refresh() { (await isDownloaded()) ? setDone() : setIdle(); }
+
+  function setStale() {
+    btn.textContent = t('downloadTour');
+    btn.disabled = false;
+    btn.classList.add('warn');
+    btn.classList.remove('secondary', 'good');
+    stateEl.innerHTML = `<p class="dl-hint warn-text">${esc(t('tourUpdateAvailable'))}</p>`;
+  }
+
+  function setEvicted() {
+    btn.textContent = t('downloadTour');
+    btn.disabled = false;
+    btn.classList.add('warn');
+    btn.classList.remove('secondary', 'good');
+    stateEl.innerHTML = `<p class="dl-hint warn-text">${esc(t('tourReDownloadHint'))}</p>`;
+  }
+
+  async function refresh() {
+    const dl = await tourDownloadState(tr.id, tr.path, tr.version);
+    if (dl === 'current') setDone();
+    else if (dl === 'stale') setStale();
+    else if (dl === 'evicted') setEvicted();
+    else setIdle();
+  }
 
   btn.onclick = async () => {
     if (!('caches' in window)) return;
-    btn.disabled = true; btn.textContent = t('downloadingTour');
+    btn.disabled = true;
+    btn.textContent = t('downloadingTour');
     stateEl.innerHTML = `<div class="dl-bar"><i></i></div>`;
     const bar = $('.dl-bar > i', stateEl);
     try {
       const urls = await tourAssetUrls(tr, loadTour);
       const cache = await caches.open(cn);
       let done = 0;
+      let criticalFailed = 0;
       for (const u of urls) {
         try {
           const res = await fetch(u, { cache: 'reload' });
-          if (res.ok) await putCachedUrl(cache, u, res);
-        } catch { /* cover may 404 */ }
-        done++; bar.style.width = `${Math.round((done / urls.length) * 100)}%`;
+          if (res.ok) {
+            await putCachedUrl(cache, u, res);
+          } else if (!isOptionalTourAsset(u, tr.cover)) {
+            if (isCriticalTourAsset(u, tr.path)) criticalFailed++;
+          }
+        } catch {
+          if (!isOptionalTourAsset(u, tr.cover) && isCriticalTourAsset(u, tr.path)) criticalFailed++;
+        }
+        done++;
+        bar.style.width = `${Math.round((done / urls.length) * 100)}%`;
+      }
+      if (criticalFailed > 0) {
+        await caches.delete(cn);
+        btn.disabled = false;
+        btn.textContent = t('downloadTour');
+        btn.classList.add('warn');
+        btn.classList.remove('secondary', 'good');
+        const msg = t('tourDownloadIncomplete').replace('{n}', String(criticalFailed));
+        stateEl.innerHTML = `<span class="warn-text">⚠︎ ${esc(msg)}</span>`;
+        return;
       }
       await deleteStaleTourCaches(tr.id, cn);
       markTourDownloaded(tr.id, tr.version);
       setDone();
     } catch {
-      btn.disabled = false; btn.textContent = t('downloadTour');
-      stateEl.innerHTML = `<span class="muted">⚠︎ ${esc(t('errorAudioBody'))}</span>`;
+      await caches.delete(cn).catch(() => {});
+      btn.disabled = false;
+      btn.textContent = t('downloadTour');
+      stateEl.innerHTML = `<span class="warn-text">⚠︎ ${esc(t('errorAudioBody'))}</span>`;
     }
   };
   refresh();
 }
 
 export function renderHome() {
+  tryActivateDeferredSw();
   if (!isPlayerOpen()) state.activeTour = null;
   const standalone = window.navigator.standalone || matchMedia('(display-mode: standalone)').matches;
   app.innerHTML = `

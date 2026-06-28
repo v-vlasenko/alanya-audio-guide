@@ -1,7 +1,9 @@
 'use strict';
 
 import { lon2x, lat2y } from './geo.js';
-import { matchCachedUrl, readTourJsonFromCaches, findTourDownloadCache } from './cache.js';
+import {
+  matchCachedUrl, readTourJsonFromCaches, findTourDownloadCache,
+} from './cache.js';
 
 export let INDEX = null;
 export const tourCache = new Map();
@@ -32,36 +34,40 @@ export async function loadTour(id) {
   const cacheKey = `${id}@${tr.version}`;
   if (tourCache.has(cacheKey)) return tourCache.get(cacheKey);
 
-  let tour = await readTourJsonFromCaches(id);
+  let tour = await readTourJsonFromCaches(id, tr.version);
   if (tour) {
     tourCache.set(cacheKey, tour);
     return tour;
   }
 
-  const cn = await findTourDownloadCache(id, tr.path);
+  const cn = await findTourDownloadCache(id, tr.path, tr.version);
   if (cn) {
     const hit = await matchCachedUrl(await caches.open(cn), tr.path);
     if (hit?.ok) {
       tour = await hit.json();
-      tourCache.set(cacheKey, tour);
-      return tour;
+      if (!tour.version || tour.version === tr.version) {
+        tourCache.set(cacheKey, tour);
+        return tour;
+      }
     }
   }
 
-  if (!navigator.onLine) throw new Error('offline');
-
-  const res = await fetch(tr.path, { cache: 'no-store' });
-  if (!res.ok) throw new Error('fetch failed');
-  tour = await res.json();
-  tourCache.set(cacheKey, tour);
-  return tour;
+  try {
+    const res = await fetch(tr.path, { cache: 'no-store' });
+    if (!res.ok) throw new Error('fetch failed');
+    tour = await res.json();
+    tourCache.set(cacheKey, tour);
+    return tour;
+  } catch {
+    throw new Error('offline');
+  }
 }
 
 export async function tourAssetUrls(tr, loadTourFn) {
   const tour = await loadTourFn(tr.id);
   const base = tour.basePath;
   const urls = [tr.path, tr.cover];
-  tour.checkpoints.forEach((c) => urls.push(base + c.audio));
+  tour.checkpoints.forEach((c) => { if (c.audio) urls.push(base + c.audio); });
   try {
     const meta = await fetch(`${base}tiles/meta.json`).then((r) => r.json());
     const { bbox, zoomMin, zoomMax } = meta;

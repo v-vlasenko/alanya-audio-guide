@@ -3,6 +3,7 @@
 export const tourDlKey = (id) => `tour-dl-${id}`;
 
 export function markTourDownloaded(id, version) { localStorage.setItem(tourDlKey(id), version); }
+export function loadTourDownloadVersion(id) { return localStorage.getItem(tourDlKey(id)); }
 export function clearTourDownloaded(id) { localStorage.removeItem(tourDlKey(id)); }
 
 export function loadCompleted(id) {

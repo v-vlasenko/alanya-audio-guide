@@ -3,16 +3,16 @@
    when the app is online. */
 'use strict';
 
-const SHELL = 'shell-v45';
+const SHELL = 'shell-v46';
 const SHELL_ASSETS = [
-  './', 'index.html', 'app.css', 'app.js', 'manifest.json',
+  './', 'index.html', 'app.css', 'manifest.json',
   'lib/leaflet.js', 'lib/leaflet.css',
   'data/ui-strings-uk.json', 'tours/index.json',
   'icons/icon-192.png', 'icons/icon-512.png',
   'icons/icon-512-maskable.png', 'icons/apple-touch-icon.png',
   'js/main.js', 'js/dom.js', 'js/geo.js', 'js/icons.js', 'js/constants.js',
   'js/i18n.js', 'js/state.js', 'js/storage.js', 'js/cache.js', 'js/catalog.js',
-  'js/sw-register.js', 'js/nearby.js', 'js/install.js', 'js/completion.js',
+  'js/sw-register.js', 'js/offline.js', 'js/nearby.js', 'js/install.js', 'js/completion.js',
   'js/tour-list.js', 'js/player.js', 'js/map.js', 'js/home.js', 'js/tour.js',
   'js/router.js', 'js/checkpoint-ui.js',
 ];

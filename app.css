@@ -228,6 +228,13 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .sheet ol{padding-left:20px; line-height:1.6}
 .webview-warn{position:fixed; left:8px; right:8px; top:12px; z-index:1300;
   background:#4a1f12; color:#ffd9c2; border:1px solid #7a3b22; border-radius:12px; padding:12px 14px; font-size:15px}
+.offline-bar{position:fixed; left:0; right:0; top:0; z-index:1250; text-align:center;
+  background:#1a3d2e; color:#b8f0d0; border-bottom:1px solid #2d6b4a; padding:8px 12px; font-size:14px}
+body:has(.offline-bar:not([hidden])) .home-head{padding-top:36px}
+body:has(.offline-bar:not([hidden])) .topbar{margin-top:28px}
+.btn.warn{background:#5a3a12; border-color:#8a5a22; color:#ffe8c8}
+.warn-text{color:#e8a040; font-size:14px}
+.dl-hint{margin:8px 0 0}
 
 .install-hint{margin-top:18px; text-align:center}
 .refresh-hint{margin-top:24px; text-align:center}

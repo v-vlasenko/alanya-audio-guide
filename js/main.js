@@ -12,6 +12,7 @@ import { refreshCheckpointUi } from './checkpoint-ui.js';
 import {
   playIndex, isPlayerOpen, getPlayerTour,
 } from './player.js';
+import { initOfflineIndicator } from './offline.js';
 
 function detectWebview() {
   const ua = navigator.userAgent || '';
@@ -41,9 +42,14 @@ async function boot() {
     initI18n(strings);
     initCatalog(index);
   } catch {
-    app.innerHTML = '<p>Не вдалося завантажити дані. Перевірте з\'єднання та оновіть сторінку.</p>';
+    const offline = !navigator.onLine;
+    const msg = offline
+      ? 'Відкрийте гід один раз на Wi-Fi, щоб він зберегся на телефон. Потім працюватиме без інтернету.'
+      : 'Не вдалося завантажити дані. Перевірте з\'єднання та оновіть сторінку.';
+    app.innerHTML = `<p>${msg}</p>`;
     return;
   }
+  initOfflineIndicator();
   document.title = INDEX.appName || document.title;
   detectWebview();
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';

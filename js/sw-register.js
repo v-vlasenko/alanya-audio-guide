@@ -2,10 +2,26 @@
 
 import { deleteAllCaches } from './cache.js';
 import { clearAllTourDownloads } from './storage.js';
+import { isPlayerOpen } from './player.js';
+
+let deferredWaitingWorker = null;
+let pendingReload = false;
+
+function shouldDeferSwReload() {
+  if (isPlayerOpen()) return true;
+  return /^#\/tour\//.test(location.hash);
+}
+
+export function tryActivateDeferredSw() {
+  if (!deferredWaitingWorker || !navigator.onLine || shouldDeferSwReload()) return;
+  pendingReload = true;
+  deferredWaitingWorker.postMessage({ type: 'skipWaiting' });
+  deferredWaitingWorker = null;
+}
 
 export async function registerSW() {
   if (!('serviceWorker' in navigator)) return;
-  let pendingReload = false;
+  pendingReload = false;
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!pendingReload) return;
@@ -31,6 +47,10 @@ export async function registerSW() {
 
     const activateWaiting = (worker) => {
       if (!worker || !navigator.serviceWorker.controller || !navigator.onLine) return;
+      if (shouldDeferSwReload()) {
+        deferredWaitingWorker = worker;
+        return;
+      }
       pendingReload = true;
       worker.postMessage({ type: 'skipWaiting' });
     };
