@@ -282,10 +282,12 @@ let activeTour = null;
 let completedSet = new Set();
 
 async function loadTour(id) {
-  if (tourCache.has(id)) return tourCache.get(id);
   const tr = INDEX.tours.find((x) => x.id === id);
-  const tour = await fetch(tr.path).then((r) => r.json());
-  tourCache.set(id, tour);
+  if (!tr) throw new Error(`unknown tour ${id}`);
+  const cacheKey = `${id}@${tr.version}`;
+  if (tourCache.has(cacheKey)) return tourCache.get(cacheKey);
+  const tour = await fetch(tr.path, { cache: 'no-store' }).then((r) => r.json());
+  tourCache.set(cacheKey, tour);
   return tour;
 }
 
