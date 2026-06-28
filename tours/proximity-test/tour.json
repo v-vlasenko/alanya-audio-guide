@@ -1,0 +1,32 @@
+{
+  "id": "proximity-test",
+  "title": "🧪 GPS proximity test",
+  "subtitle": "Тестова точка для перевірки підказки «Ви поруч»",
+  "region": "Test",
+  "language": "uk",
+  "version": "1.0",
+  "basePath": "tours/proximity-test/",
+  "defaultRadiusM": 80,
+  "anchor": {
+    "lat": 49.199,
+    "lng": 31.8738
+  },
+  "durationMin": 1,
+  "tip": "Увімкніть GPS на карті (📍), підійдіть до координат 49.1990, 31.8738 — з’явиться картка «Ви поруч». Після тесту цей тур можна прибрати.",
+  "audioPathNote": "Dev-only tour for proximity QA.",
+  "checkpoints": [
+    {
+      "id": "test-point",
+      "order": 1,
+      "title": "Test proximity point",
+      "shortTitle": "GPS test",
+      "optional": false,
+      "audio": "audio/test-point.mp3",
+      "lat": 49.199,
+      "lng": 31.8738,
+      "radiusM": 100,
+      "coordsVerified": true,
+      "transcript": "Тестова зупинка для перевірки GPS-підказки. Якщо ви чуєте це — geofencing працює."
+    }
+  ]
+}
