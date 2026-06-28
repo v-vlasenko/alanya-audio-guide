@@ -812,9 +812,9 @@ function buildPlayer() {
   ensurePlayerShell();
   ensurePlayerBackdrop();
   setupMediaSessionHandlers();
+  const p = $('#player');
   if (playerReady) return;
   playerReady = true;
-  const p = $('#player');
   p.innerHTML = `
     <div class="pt" id="p-head">
       <span id="p-title"></span>
@@ -823,15 +823,17 @@ function buildPlayer() {
     <div class="seek">
       <span id="p-cur">0:00</span>
       <input type="range" id="p-seek" min="0" max="100" value="0" step="1">
-      <span id="p-dur">0:00</span>
-      <button class="p-icon-btn p-speed-btn" id="p-speed" type="button" title="Швидкість відтворення">1×</button>
+      <div class="seek-end">
+        <span id="p-dur">0:00</span>
+        <button class="p-ctl" id="p-speed" type="button" title="Швидкість відтворення">1×</button>
+      </div>
     </div>
     <div class="pcontrols">
-      <button class="p-icon-btn p-nav" id="p-prev" type="button" aria-label="${esc(t('previous'))}">${PREV_TRACK_ICON}</button>
-      <button class="p-icon-btn p-skip" id="p-skip-back" type="button" aria-label="−5 с">${SKIP_BACK_ICON}</button>
-      <button class="p-icon-btn p-play-btn" id="p-play" type="button" aria-label="${esc(t('playLabel'))}">${PLAY_ICON}</button>
-      <button class="p-icon-btn p-skip" id="p-skip-fwd" type="button" aria-label="+5 с">${SKIP_FWD_ICON}</button>
-      <button class="p-icon-btn p-nav" id="p-next" type="button" aria-label="${esc(t('next'))}">${NEXT_TRACK_ICON}</button>
+      <button class="btn secondary p-nav" id="p-prev" type="button" aria-label="${esc(t('previous'))}">${PREV_TRACK_ICON}</button>
+      <button class="p-ctl p-skip" id="p-skip-back" type="button" aria-label="−5 с">${SKIP_BACK_ICON}</button>
+      <button class="btn p-play-btn" id="p-play" type="button" aria-label="${esc(t('playLabel'))}">${PLAY_ICON}</button>
+      <button class="p-ctl p-skip" id="p-skip-fwd" type="button" aria-label="+5 с">${SKIP_FWD_ICON}</button>
+      <button class="btn secondary p-nav" id="p-next" type="button" aria-label="${esc(t('next'))}">${NEXT_TRACK_ICON}</button>
     </div>
     <div class="p-mark-row" id="p-mark-row"><button class="btn ghost sm" id="p-mark-done">${esc(t('markCompleted'))}</button></div>
     <div class="transcript" id="p-transcript"></div>
