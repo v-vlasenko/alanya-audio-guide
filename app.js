@@ -31,6 +31,40 @@ async function putCachedUrl(cache, path, res) {
   try { await cache.put(assetUrl(path), res.clone()); } catch { /* quota */ }
 }
 
+const tourDlKey = (id) => `tour-dl-${id}`;
+function markTourDownloaded(id, version) { localStorage.setItem(tourDlKey(id), version); }
+function clearTourDownloaded(id) { localStorage.removeItem(tourDlKey(id)); }
+
+async function matchGlobalCached(path) {
+  if (!('caches' in window)) return null;
+  for (const key of [path, assetUrl(path)]) {
+    const hit = await caches.match(key);
+    if (hit) return hit;
+  }
+  const hit = await caches.match(new Request(path));
+  if (hit) return hit;
+  const keys = await caches.keys();
+  for (const cn of keys) {
+    const found = await matchCachedUrl(await caches.open(cn), path);
+    if (found) return found;
+  }
+  return null;
+}
+
+async function readTourJsonFromCaches(id) {
+  if (!('caches' in window)) return null;
+  const keys = (await caches.keys()).filter((k) => k.startsWith(`tour-${id}-`));
+  for (const cn of keys) {
+    const c = await caches.open(cn);
+    for (const req of await c.keys()) {
+      if (!req.url.includes('tour.json')) continue;
+      const hit = await c.match(req);
+      if (hit?.ok) return hit.json();
+    }
+  }
+  return null;
+}
+
 async function findTourDownloadCache(id, tourPath) {
   if (!('caches' in window)) return null;
   const keys = await caches.keys();
@@ -43,6 +77,7 @@ async function findTourDownloadCache(id, tourPath) {
 }
 
 async function deleteTourDownload(id) {
+  clearTourDownloaded(id);
   if (!('caches' in window)) return;
   const keys = await caches.keys();
   await Promise.all(keys.filter((k) => k.startsWith(`tour-${id}-`)).map((k) => caches.delete(k)));
@@ -81,12 +116,8 @@ const lat2y = (lat, z) => {
 
 /* ---------- boot ---------- */
 async function fetchJsonCached(path) {
-  if ('caches' in window) {
-    for (const key of [path, assetUrl(path)]) {
-      const hit = await caches.match(key);
-      if (hit?.ok) return hit.json();
-    }
-  }
+  const hit = await matchGlobalCached(path);
+  if (hit?.ok) return hit.json();
   if (!navigator.onLine) throw new Error('offline');
   const res = await fetch(path);
   if (!res.ok) throw new Error(`fetch ${path}`);
@@ -95,6 +126,7 @@ async function fetchJsonCached(path) {
 
 async function boot() {
   try {
+    await registerSW();
     [STR, INDEX] = await Promise.all([
       fetchJsonCached('data/ui-strings-uk.json'),
       fetchJsonCached('tours/index.json'),
@@ -105,14 +137,13 @@ async function boot() {
   }
   document.title = INDEX.appName || document.title;
   detectWebview();
-  registerSW();
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   window.addEventListener('hashchange', route);
   route();
 }
 
 /* ---------- service worker + offline heal ---------- */
-function registerSW() {
+async function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   let pendingReload = false;
 
@@ -122,19 +153,24 @@ function registerSW() {
     location.reload();
   });
 
-  navigator.serviceWorker.register('sw.js').then((reg) => {
+  try {
+    const reg = await navigator.serviceWorker.register('sw.js');
+    await navigator.serviceWorker.ready;
+
     const heal = () => navigator.serviceWorker.controller?.postMessage({ type: 'heal' });
     if (navigator.serviceWorker.controller) heal();
-    else navigator.serviceWorker.addEventListener('controllerchange', heal, { once: true });
 
-    const checkUpdate = () => reg.update().catch(() => {});
+    const checkUpdate = () => {
+      if (!navigator.onLine) return;
+      reg.update().catch(() => {});
+    };
     checkUpdate();
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') checkUpdate();
     });
 
     const activateWaiting = (worker) => {
-      if (!worker || !navigator.serviceWorker.controller) return;
+      if (!worker || !navigator.serviceWorker.controller || !navigator.onLine) return;
       pendingReload = true;
       worker.postMessage({ type: 'skipWaiting' });
     };
@@ -148,13 +184,14 @@ function registerSW() {
         if (worker.state === 'installed') activateWaiting(worker);
       });
     });
-  }).catch(() => {});
+  } catch { /* offline / blocked */ }
 }
 
 async function hardRefresh() {
   try {
     const keys = await caches.keys();
     await Promise.all(keys.map((k) => caches.delete(k)));
+    Object.keys(localStorage).filter((k) => k.startsWith('tour-dl-')).forEach((k) => localStorage.removeItem(k));
     const regs = await navigator.serviceWorker.getRegistrations();
     await Promise.all(regs.map((r) => r.unregister()));
   } catch {}
@@ -276,6 +313,7 @@ async function wireDownload(tr, card) {
   const cn = cacheName(tr.id, tr.version);
 
   async function isDownloaded() {
+    if (await readTourJsonFromCaches(tr.id)) return true;
     return !!(await findTourDownloadCache(tr.id, tr.path));
   }
   function setDone() {
@@ -309,6 +347,7 @@ async function wireDownload(tr, card) {
       }
       const keys = await caches.keys();
       await Promise.all(keys.filter((k) => k.startsWith(`tour-${tr.id}-`) && k !== cn).map((k) => caches.delete(k)));
+      markTourDownloaded(tr.id, tr.version);
       setDone();
     } catch (e) {
       btn.disabled = false; btn.textContent = t('downloadTour');
@@ -349,11 +388,17 @@ async function loadTour(id) {
   const cacheKey = `${id}@${tr.version}`;
   if (tourCache.has(cacheKey)) return tourCache.get(cacheKey);
 
+  let tour = await readTourJsonFromCaches(id);
+  if (tour) {
+    tourCache.set(cacheKey, tour);
+    return tour;
+  }
+
   const cn = await findTourDownloadCache(id, tr.path);
   if (cn) {
     const hit = await matchCachedUrl(await caches.open(cn), tr.path);
     if (hit?.ok) {
-      const tour = await hit.json();
+      tour = await hit.json();
       tourCache.set(cacheKey, tour);
       return tour;
     }
@@ -363,7 +408,7 @@ async function loadTour(id) {
 
   const res = await fetch(tr.path, { cache: 'no-store' });
   if (!res.ok) throw new Error('fetch failed');
-  const tour = await res.json();
+  tour = await res.json();
   tourCache.set(cacheKey, tour);
   return tour;
 }
