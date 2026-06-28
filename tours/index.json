@@ -1,7 +1,7 @@
 {
   "_comment": "Tour catalog. The app reads this to render the tour-picker home screen. To ADD a new tour: create tours/<id>/tour.json (+ audio), then add one entry here. No code changes needed. 'path' is from site root.",
   "appName": "Аудіогіди Аланії",
-  "appVersion": "1.1",
+  "appVersion": "1.2",
   "language": "uk",
   "tours": [
     {
@@ -40,6 +40,18 @@
       "approxSizeMb": 7,
       "bestTime": "Найкраще надвечір, гарний захід сонця",
       "version": "1.2"
+    },
+    {
+      "id": "cache-test",
+      "title": "🧪 Тест оновлення каталогу",
+      "subtitle": "Має з’явитися після оновлення без скидання кешу",
+      "region": "Тест",
+      "path": "tours/cache-test/tour.json",
+      "cover": "tours/cache-test/cover.jpg",
+      "checkpointCount": 1,
+      "durationMin": 1,
+      "approxSizeMb": 0,
+      "version": "1.0"
     }
   ]
 }

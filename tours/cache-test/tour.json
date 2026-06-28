@@ -1,0 +1,28 @@
+{
+  "id": "cache-test",
+  "title": "🧪 Тест оновлення каталогу",
+  "subtitle": "Тестовий маршрут — має з’явитися після оновлення без скидання кешу",
+  "region": "Тест",
+  "language": "uk",
+  "version": "1.0",
+  "basePath": "tours/cache-test/",
+  "defaultRadiusM": 30,
+  "anchor": { "lat": 36.543, "lng": 31.988 },
+  "durationMin": 1,
+  "tip": "Якщо ви бачите цю картку після деплою без «Скинути кеш» — network-first для tours/index.json працює.",
+  "checkpoints": [
+    {
+      "id": "01-test",
+      "order": 1,
+      "title": "Тестова точка",
+      "shortTitle": "Тест",
+      "zone": "test",
+      "optional": false,
+      "lat": 36.543,
+      "lng": 31.988,
+      "radiusM": 30,
+      "coordsVerified": false,
+      "transcript": "Це тестовий маршрут. Він перевіряє, що новий тур з’являється на головному екрані після оновлення застосунку, коли tours/index.json оновлюється через мережу."
+    }
+  ]
+}
