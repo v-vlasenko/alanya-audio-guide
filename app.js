@@ -21,8 +21,8 @@ const fmtTime = (s) => { s = Math.floor(s || 0); return `${Math.floor(s / 60)}:$
 const haptic = (ms = 10) => navigator.vibrate?.(ms);
 
 const MARK_ICON = {
-  pending: '<svg class="mark-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
-  done: '<svg class="mark-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>',
+  pending: '<svg class="mark-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+  done: '<svg class="mark-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4" fill="rgba(255,255,255,.18)"/><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>',
 };
 
 const EARTH_R = 6371000;
@@ -639,11 +639,13 @@ function buildPlayer() {
       <span id="p-dur">0:00</span>
     </div>
     <div class="pcontrols">
-      <button class="btn secondary" id="p-prev">${esc(t('previous'))}</button>
-      <button class="btn" id="p-play">${esc(t('play'))}</button>
-      <button class="btn secondary" id="p-next">${esc(t('next'))}</button>
+      <button class="btn secondary p-nav" id="p-prev" type="button">${esc(t('previous'))}</button>
+      <div class="p-center">
+        <button class="btn p-play-btn" id="p-play" type="button"><span class="p-play-label">${esc(t('playLabel'))}</span></button>
+        <button class="btn ghost sm p-speed" id="p-speed" type="button" title="Швидкість відтворення">1×</button>
+      </div>
+      <button class="btn secondary p-nav" id="p-next" type="button">${esc(t('next'))}</button>
     </div>
-    <div class="p-speed-row"><button class="btn ghost sm" id="p-speed" title="Швидкість відтворення">1×</button></div>
     <div class="p-mark-row" id="p-mark-row"><button class="btn ghost sm" id="p-mark-done">${esc(t('markCompleted'))}</button></div>
     <div class="transcript" id="p-transcript"></div>
   `;
@@ -658,9 +660,13 @@ function buildPlayer() {
       if (audio.currentTime > maxListenedSec) maxListenedSec = audio.currentTime;
     }
   });
-  audio.addEventListener('play', () => { const b = $('#p-play'); if (b) b.textContent = t('pause'); markPlaying(true); });
+  const setPlayBtn = (playing) => {
+    const label = $('#p-play .p-play-label');
+    if (label) label.textContent = playing ? t('pauseLabel') : t('playLabel');
+  };
+  audio.addEventListener('play', () => { setPlayBtn(true); markPlaying(true); });
   audio.addEventListener('pause', () => {
-    const b = $('#p-play'); if (b) b.textContent = t('play'); markPlaying(false);
+    setPlayBtn(false); markPlaying(false);
     if (lastPos) checkProximity(lastPos.lat, lastPos.lng);
   });
   audio.addEventListener('ended', () => {

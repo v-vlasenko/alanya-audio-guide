@@ -91,17 +91,16 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 
 /* ---- checkpoint list ---- */
 .cp-list{display:flex; flex-direction:column; gap:10px}
-.cp-row{display:flex; align-items:stretch; gap:8px}
+.cp-row{display:flex; align-items:center; gap:8px}
 .cp-row .cp{flex:1; min-width:0}
 .cp-mark{
-  flex:0 0 44px; width:44px; min-height:var(--tap); border-radius:12px;
-  background:var(--bg2); border:1px solid var(--line); color:var(--muted);
+  flex:0 0 44px; width:44px; height:44px; min-height:0; border-radius:8px;
+  background:var(--bg2); border:2px solid var(--line); color:var(--muted);
   display:flex; align-items:center; justify-content:center; padding:0;
 }
-.cp-mark .mark-icon{display:block; width:22px; height:22px}
+.cp-mark .mark-icon{display:block; width:20px; height:20px}
 .cp-mark:active{opacity:.85}
 .cp-mark.done{background:#3d9a5f; border-color:#3d9a5f; color:#fff}
-.cp-mark.done .mark-icon{width:24px; height:24px}
 .cp{
   display:flex; align-items:center; gap:14px; width:100%; text-align:left;
   background:var(--card); border:1px solid var(--line); border-radius:14px;
@@ -168,11 +167,20 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .player .pt .close{margin-left:auto; color:var(--muted); font-size:22px; width:32px}
 .seek{display:flex; align-items:center; gap:10px; font-size:13px; color:var(--muted)}
 .seek input[type=range]{flex:1; accent-color:var(--accent); height:32px}
-.pcontrols{display:flex; gap:10px; margin:10px 0 4px}
+.pcontrols{
+  display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:start;
+  margin:12px 0 6px;
+}
+.pcontrols .p-nav{min-height:50px; font-size:15px; padding:0 10px; width:100%}
+.p-center{display:flex; flex-direction:column; align-items:center; gap:6px}
+.p-play-btn{
+  min-width:132px; min-height:50px; width:auto; padding:0 16px;
+  font-size:17px; line-height:1; border-radius:14px;
+}
+.p-play-btn .p-play-label{display:block; line-height:1.2; text-align:center}
+.p-speed{min-height:32px; min-width:48px; padding:0 10px; font-size:14px; border-radius:8px}
 .p-mark-row{margin:8px 0 4px}
 .p-mark-row .btn{width:100%}
-.p-speed-row{text-align:right; margin-bottom:6px}
-.pcontrols .btn{min-height:54px}
 .transcript{max-height:26vh; overflow:auto; color:var(--fg); font-size:16px; line-height:1.5;
   background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-top:8px;
   -webkit-overflow-scrolling:touch}
@@ -213,7 +221,7 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .nearby-go{width:100%}
 [hidden]{display:none!important}
 .player.info-only .seek,
-.player.info-only .p-speed-row,
+.player.info-only .p-speed,
 .player.info-only .p-mark-row,
 .player.info-only #p-play{display:none}
 /* Leaflet popup dark theme */
