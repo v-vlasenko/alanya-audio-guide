@@ -169,3 +169,41 @@ export function downloadWeight(url, tourPath, coverPath) {
   if (url === tourPath || url.endsWith('.json')) return 2;
   return 10;
 }
+
+export const DOWNLOAD_CONCURRENCY = 6;
+
+export async function downloadTourAssets(cache, urls, weights, tourPath, coverPath, signal, onProgress) {
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0) || 1;
+  let doneWeight = 0;
+  let criticalFailed = 0;
+  let next = 0;
+
+  async function fetchOne(i) {
+    const u = urls[i];
+    try {
+      const res = await fetch(u, { cache: 'reload', signal });
+      if (res.ok) {
+        await putCachedUrl(cache, u, res);
+      } else if (!isOptionalTourAsset(u, coverPath) && isCriticalTourAsset(u, tourPath)) {
+        criticalFailed++;
+      }
+    } catch (err) {
+      if (signal.aborted || err.name === 'AbortError') throw err;
+      if (!isOptionalTourAsset(u, coverPath) && isCriticalTourAsset(u, tourPath)) criticalFailed++;
+    } finally {
+      doneWeight += weights[i];
+      onProgress((doneWeight / totalWeight) * 92);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(DOWNLOAD_CONCURRENCY, urls.length) }, async () => {
+    while (next < urls.length) {
+      if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      const i = next++;
+      await fetchOne(i);
+    }
+  });
+
+  await Promise.all(workers);
+  return { criticalFailed };
+}

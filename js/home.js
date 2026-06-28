@@ -7,8 +7,8 @@ import {
   INDEX, loadTour, tourAssetUrls, tourCheckpointTotal, isTourFullyCompleted,
 } from './catalog.js';
 import {
-  cacheName, putCachedUrl, deleteTourDownload, deleteStaleTourCaches,
-  tourDownloadState, isCriticalTourAsset, isOptionalTourAsset, downloadWeight,
+  cacheName, deleteTourDownload, deleteStaleTourCaches,
+  tourDownloadState, downloadTourAssets, downloadWeight,
 } from './cache.js';
 import { markTourDownloaded, loadCompleted, clearTourDownloaded } from './storage.js';
 import { isPlayerOpen } from './player.js';
@@ -121,32 +121,15 @@ async function wireDownload(tr, card) {
       const urls = await tourAssetUrls(tr, loadTour);
       if (dl.abort.signal.aborted) return;
       const cache = await caches.open(cn);
-      const weights = urls.map((u) => downloadWeight(u, tr.path, tr.cover));
-      const totalWeight = weights.reduce((sum, w) => sum + w, 0) || 1;
-      let doneWeight = 0;
-      let criticalFailed = 0;
       const setProgress = (pct) => {
         const p = Math.min(99, Math.max(0, Math.round(pct)));
         setDownloadProgress(tr.id, p);
         if (card.isConnected) setDownloading(p);
       };
-      for (let i = 0; i < urls.length; i++) {
-        if (dl.abort.signal.aborted) throw new DOMException('Aborted', 'AbortError');
-        const u = urls[i];
-        try {
-          const res = await fetch(u, { cache: 'reload', signal: dl.abort.signal });
-          if (res.ok) {
-            await putCachedUrl(cache, u, res);
-          } else if (!isOptionalTourAsset(u, tr.cover)) {
-            if (isCriticalTourAsset(u, tr.path)) criticalFailed++;
-          }
-        } catch (err) {
-          if (dl.abort.signal.aborted || err.name === 'AbortError') throw err;
-          if (!isOptionalTourAsset(u, tr.cover) && isCriticalTourAsset(u, tr.path)) criticalFailed++;
-        }
-        doneWeight += weights[i];
-        setProgress((doneWeight / totalWeight) * 92);
-      }
+      const { criticalFailed } = await downloadTourAssets(
+        cache, urls, urls.map((u) => downloadWeight(u, tr.path, tr.cover)),
+        tr.path, tr.cover, dl.abort.signal, setProgress,
+      );
       if (criticalFailed > 0) {
         await caches.delete(cn);
         clearTourDownloaded(tr.id);
