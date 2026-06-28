@@ -98,6 +98,7 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 /* ---- map ---- */
 #map{height:62vh; min-height:340px; border-radius:var(--r); overflow:hidden; border:1px solid var(--line)}
 .map-wrap{position:relative}
+.leaflet-top,.leaflet-bottom{z-index:600}
 .recenter{position:absolute; right:12px; bottom:12px; z-index:600; width:52px; height:52px;
   border-radius:50%; background:var(--accent); color:#1a0f08; font-size:22px; box-shadow:0 2px 8px rgba(0,0,0,.5);
   display:flex; align-items:center; justify-content:center}
