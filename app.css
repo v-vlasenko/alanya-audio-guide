@@ -71,30 +71,37 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .tour-card.is-complete{border-color:#3d9a5f66}
 
 /* ---- tour view ---- */
-.topbar{display:flex; align-items:center; gap:12px; padding:6px 0 12px; position:sticky; top:var(--net-h,0px);
+.topbar{display:flex; align-items:center; gap:10px; padding:4px 0 8px; position:sticky; top:var(--net-h,0px);
   background:linear-gradient(var(--bg),var(--bg) 70%,transparent); z-index:50}
-.topbar h2{flex:1; font-size:20px; margin:0}
-.tabs{display:flex; gap:8px; margin:4px 0 14px}
-.tabs button{flex:1; min-height:50px; border-radius:12px; background:var(--card);
-  border:1px solid var(--line); font-weight:700; color:var(--muted)}
+.topbar h2{flex:1; font-size:18px; margin:0}
+.tabs{display:flex; gap:8px; margin:0 0 10px}
+.tabs button{flex:1; min-height:44px; border-radius:12px; background:var(--card);
+  border:1px solid var(--line); font-weight:700; font-size:16px; color:var(--muted)}
 .tabs button[aria-selected=true]{background:var(--accent); color:#1a0f08; border-color:var(--accent)}
-.tip{background:var(--bg2); border:1px solid var(--line); border-radius:12px; padding:12px 14px;
-  color:var(--muted); font-size:15px; margin-bottom:10px}
-.usage-tips{background:var(--bg2); border:1px solid #3a4a5a; border-radius:12px; padding:10px 14px;
-  color:#a8c4d8; font-size:14px; line-height:1.45; margin-bottom:14px}
-.usage-tips p{margin:0}
+.hints-fold{margin-bottom:8px; border:1px solid var(--line); border-radius:12px; background:var(--bg2)}
+.hints-fold summary{padding:9px 14px; font-size:15px; font-weight:700; color:var(--muted); cursor:pointer; list-style:none}
+.hints-fold summary::-webkit-details-marker{display:none}
+.hints-fold[open] summary{border-bottom:1px solid var(--line)}
+.hints-fold .hints-body{padding:10px 14px; font-size:14px; line-height:1.4; color:#a8c4d8}
+.hints-fold .hints-body p{margin:0 0 8px}
+.hints-fold .hints-body p:last-child{margin:0}
+.tour-toolbar{display:flex; gap:8px; align-items:stretch; margin-bottom:8px}
+.tour-toolbar .tour-start{flex:1; min-height:48px; font-size:17px; padding:0 14px}
+.tour-toolbar .btn-reset{flex:0 0 48px; min-height:48px; width:48px; padding:0; font-size:20px}
 
 /* ---- checkpoint list ---- */
 .cp-list{display:flex; flex-direction:column; gap:10px}
 .cp-row{display:flex; align-items:stretch; gap:8px}
 .cp-row .cp{flex:1; min-width:0}
 .cp-mark{
-  flex:0 0 46px; min-height:var(--tap); border-radius:14px;
+  flex:0 0 44px; width:44px; min-height:var(--tap); border-radius:12px;
   background:var(--bg2); border:1px solid var(--line); color:var(--muted);
-  font-size:20px; font-weight:800;
+  display:flex; align-items:center; justify-content:center; padding:0;
 }
+.cp-mark .mark-icon{display:block; width:22px; height:22px}
 .cp-mark:active{opacity:.85}
-.cp-mark.done{background:#3d9a5f; border-color:#3d9a5f; color:#fff; opacity:1}
+.cp-mark.done{background:#3d9a5f; border-color:#3d9a5f; color:#fff}
+.cp-mark.done .mark-icon{width:24px; height:24px}
 .cp{
   display:flex; align-items:center; gap:14px; width:100%; text-align:left;
   background:var(--card); border:1px solid var(--line); border-radius:14px;
@@ -108,14 +115,14 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .cp .t b{display:block; font-size:17px}
 .cp .t small{color:var(--muted)}
 .cp .state{font-size:13px; color:var(--good)}
-.cp .num.done{background:#3d9a5f; color:#fff}
-.cp.completed{border-color:#3d9a5f44}
-.cp .state.done{font-weight:800; font-size:16px; color:#7dcea0}
+.cp .num.done{background:#3d9a5f; color:#fff; border:2px solid #5cb87a}
+.cp.completed{border-color:#3d9a5f55}
+.cp .state.done{font-weight:600; font-size:13px; color:#7dcea0}
 .badge{display:inline-block; font-size:12px; font-weight:700; color:#ffd28a;
   background:#3a2a12; border-radius:8px; padding:2px 8px; margin-top:4px}
 
 /* ---- map ---- */
-#map{height:62vh; min-height:340px; border-radius:var(--r); overflow:hidden; border:1px solid var(--line)}
+#map{height:68vh; min-height:360px; border-radius:var(--r); overflow:hidden; border:1px solid var(--line)}
 .map-wrap{position:relative}
 .leaflet-top,.leaflet-bottom{z-index:600}
 .recenter{position:absolute; right:12px; bottom:12px; z-index:600; width:52px; height:52px;
@@ -141,7 +148,6 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .pin>span{transform:rotate(45deg)}
 .pin.optional{background:#caa15a}
 .pin.done{background:#3d9a5f; color:#fff}
-.tour-actions{margin:-6px 0 14px; text-align:right}
 .me-dot{width:18px; height:18px; border-radius:50%; background:#2b8cff; border:3px solid #fff;
   box-shadow:0 0 0 6px rgba(43,140,255,.25)}
 .wp-pin{width:28px; height:28px; border-radius:50% 50% 50% 0; background:#4a9eff; color:#fff;

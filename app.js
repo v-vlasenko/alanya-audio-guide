@@ -20,6 +20,11 @@ const cacheName = (id, version) => `tour-${id}-${version}`;
 const fmtTime = (s) => { s = Math.floor(s || 0); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const haptic = (ms = 10) => navigator.vibrate?.(ms);
 
+const MARK_ICON = {
+  pending: '<svg class="mark-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+  done: '<svg class="mark-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>',
+};
+
 const EARTH_R = 6371000;
 function haversineM(lat1, lng1, lat2, lng2) {
   const r = (d) => (d * Math.PI) / 180;
@@ -274,10 +279,17 @@ async function renderTour(id) {
       <button class="btn ghost sm" id="back">${esc(t('backToTours'))}</button>
       <h2>${esc(tour.title)}</h2>
     </div>
-    ${tour.tip ? `<div class="tip">💡 ${esc(tour.tip)}</div>` : ''}
-    <div class="usage-tips"><p>${esc(t('gpsKeepOpenTip'))}</p></div>
-    <button class="btn" id="start">${esc(t('startTour'))}</button>
-    <div class="tour-actions"><button class="btn ghost sm" id="reset-progress">${esc(t('resetProgress'))}</button></div>
+    <details class="hints-fold">
+      <summary>${esc(t('hintsSummary'))}</summary>
+      <div class="hints-body">
+        ${tour.tip ? `<p>💡 ${esc(tour.tip)}</p>` : ''}
+        <p>${esc(t('gpsKeepOpenTip'))}</p>
+      </div>
+    </details>
+    <div class="tour-toolbar">
+      <button class="btn tour-start" id="start">${esc(t('startTour'))}</button>
+      <button class="btn ghost sm btn-reset" id="reset-progress" title="${esc(t('resetProgress'))}">↻</button>
+    </div>
     <div class="tabs" role="tablist">
       <button id="tab-list" role="tab" aria-selected="false">${esc(t('tabList'))}</button>
       <button id="tab-map" role="tab" aria-selected="true">${esc(t('tabMap'))}</button>
@@ -292,7 +304,7 @@ async function renderTour(id) {
   const savedIdx = loadProgress(id);
   if (savedIdx >= 0 && savedIdx < tour.checkpoints.length) {
     const cp = ordered()[savedIdx];
-    if (cp) $('#start').textContent = `▶ Продовжити: ${cp.shortTitle || cp.title}`;
+    if (cp) $('#start').textContent = `▶ ${cp.shortTitle || cp.title}`;
     $('#start').onclick = () => { haptic(); playIndex(savedIdx); };
   } else {
     $('#start').onclick = () => { haptic(); playIndex(0); };
@@ -328,9 +340,9 @@ function renderList() {
           <span class="state"></span>
         </span>
       </button>`);
-    const markBtn = el(`<button type="button" class="cp-mark" title="${esc(t('markCompleted'))}">✓</button>`);
+    const markBtn = el(`<button type="button" class="cp-mark" title="${esc(t('markCompleted'))}"></button>`);
     if (!cp.audio) markBtn.hidden = true;
-    markBtn.onclick = (e) => { e.stopPropagation(); haptic(); manualMarkCompleted(cp.id); };
+    markBtn.onclick = (e) => { e.stopPropagation(); haptic(); toggleMarkCompleted(cp.id); };
     wrap.appendChild(row);
     wrap.appendChild(markBtn);
     syncCpListRow(cp.id, row, markBtn);
@@ -354,7 +366,7 @@ function syncCpListRow(cpId, row, markBtn) {
   const done = completedSet.has(cpId);
   if (done) {
     row.classList.add('completed');
-    num.textContent = '✓';
+    num.textContent = cp.order;
     num.classList.add('done');
     state.textContent = t('completed');
     state.classList.add('done');
@@ -367,8 +379,8 @@ function syncCpListRow(cpId, row, markBtn) {
   }
   if (markBtn) {
     markBtn.classList.toggle('done', done);
-    markBtn.disabled = done;
-    markBtn.title = done ? t('markCompletedDone') : t('markCompleted');
+    markBtn.innerHTML = done ? MARK_ICON.done : MARK_ICON.pending;
+    markBtn.title = done ? t('markCompletedUndo') : t('markCompleted');
   }
 }
 
@@ -450,7 +462,7 @@ function checkProximity(lat, lng) {
 function cpPinHtml(cp) {
   const done = completedSet.has(cp.id);
   const cls = ['pin', cp.optional && 'optional', done && 'done'].filter(Boolean).join(' ');
-  return `<div class="${cls}"><span>${done ? '✓' : cp.order}</span></div>`;
+  return `<div class="${cls}"><span>${cp.order}</span></div>`;
 }
 
 function cpPinIcon(cp) {
@@ -683,7 +695,7 @@ function buildPlayer() {
   $('#p-close').onclick = stopPlayer;
   $('#p-mark-done').onclick = () => {
     const cp = curIdx >= 0 ? ordered()[curIdx] : null;
-    if (cp) manualMarkCompleted(cp.id);
+    if (cp) toggleMarkCompleted(cp.id);
   };
 }
 
@@ -760,6 +772,24 @@ function markCompleted(cpId) {
   return true;
 }
 
+function unmarkCompleted(cpId) {
+  if (!activeTour || !completedSet.has(cpId)) return false;
+  completedSet.delete(cpId);
+  localStorage.setItem('completed-' + activeTour.id, JSON.stringify([...completedSet]));
+  syncCpListRow(cpId);
+  syncCpMapPin(cpId);
+  syncMarkDoneBtn();
+  return true;
+}
+
+function toggleMarkCompleted(cpId) {
+  if (completedSet.has(cpId)) {
+    if (unmarkCompleted(cpId)) haptic(8);
+  } else {
+    manualMarkCompleted(cpId);
+  }
+}
+
 function manualMarkCompleted(cpId) {
   if (markCompleted(cpId)) haptic(8);
 }
@@ -772,8 +802,8 @@ function syncMarkDoneBtn() {
   if (!cp?.audio) { row.hidden = true; return; }
   row.hidden = false;
   const done = completedSet.has(cp.id);
-  btn.disabled = done;
-  btn.textContent = done ? t('markCompletedDone') : t('markCompleted');
+  btn.disabled = false;
+  btn.textContent = done ? t('markCompletedUndo') : t('markCompleted');
   btn.classList.toggle('good', done);
 }
 
