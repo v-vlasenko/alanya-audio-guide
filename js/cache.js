@@ -92,20 +92,30 @@ export async function findTourDownloadCache(id, tourPath, expectedVersion = null
   return null;
 }
 
-/** @returns {'current'|'stale'|'evicted'|'none'} */
-export async function tourDownloadState(id, tourPath, expectedVersion) {
-  if (await findTourDownloadCache(id, tourPath, expectedVersion)) {
-    const tour = await readTourJsonFromCaches(id, expectedVersion);
-    if (tour) return 'current';
-  }
+/** @returns {'current'|'stale'|'evicted'|'downloading'|'none'} */
+export async function tourDownloadState(id, tourPath, expectedVersion, isDownloadingFn = () => false) {
+  if (isDownloadingFn(id)) return 'downloading';
+
   const marked = loadTourDownloadVersion(id);
-  if (marked) {
-    const anyCache = await findTourDownloadCache(id, tourPath);
-    if (anyCache || await readTourJsonFromCaches(id)) return 'stale';
+  if (marked === expectedVersion) {
+    if (await verifyTourDownload(id, tourPath, expectedVersion)) return 'current';
     return 'evicted';
   }
-  if (await findTourDownloadCache(id, tourPath) || await readTourJsonFromCaches(id)) return 'stale';
+  if (marked) return 'stale';
   return 'none';
+}
+
+export async function verifyTourDownload(id, tourPath, expectedVersion) {
+  const cn = await findTourDownloadCache(id, tourPath, expectedVersion);
+  if (!cn) return false;
+  const c = await caches.open(cn);
+  const tour = await readTourJsonFromCaches(id, expectedVersion);
+  if (!tour?.checkpoints) return false;
+  if (!(await matchCachedUrl(c, tourPath))) return false;
+  for (const cp of tour.checkpoints) {
+    if (cp.audio && !(await matchCachedUrl(c, tour.basePath + cp.audio))) return false;
+  }
+  return true;
 }
 
 export async function deleteTourDownload(id) {

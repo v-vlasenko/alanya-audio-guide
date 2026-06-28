@@ -10,10 +10,13 @@ import {
   cacheName, putCachedUrl, deleteTourDownload, deleteStaleTourCaches,
   tourDownloadState, isCriticalTourAsset, isOptionalTourAsset, downloadWeight,
 } from './cache.js';
-import { markTourDownloaded, loadCompleted } from './storage.js';
+import { markTourDownloaded, loadCompleted, clearTourDownloaded } from './storage.js';
 import { isPlayerOpen } from './player.js';
 import { showInstallSheet } from './install.js';
 import { hardRefresh, tryActivateDeferredSw } from './sw-register.js';
+import {
+  beginDownload, endDownload, getDownloadProgress, isDownloading, setDownloadProgress,
+} from './downloads.js';
 
 function isTourFullyCompletedForCard(id, total) {
   return isTourFullyCompleted(id, total, loadCompleted(id));
@@ -57,6 +60,14 @@ async function wireDownload(tr, card) {
   const stateEl = $('.dl-state', card);
   const cn = cacheName(tr.id, tr.version);
 
+  function setDownloading(progress) {
+    btn.disabled = true;
+    btn.textContent = t('downloadingTour');
+    btn.classList.remove('good', 'warn');
+    btn.classList.add('secondary');
+    stateEl.innerHTML = `<div class="dl-bar"><i style="width:${progress}%"></i></div>`;
+  }
+
   function setDone() {
     btn.textContent = t('tourDownloaded');
     btn.classList.add('good');
@@ -91,7 +102,11 @@ async function wireDownload(tr, card) {
   }
 
   async function refresh() {
-    const dl = await tourDownloadState(tr.id, tr.path, tr.version);
+    const dl = await tourDownloadState(tr.id, tr.path, tr.version, isDownloading);
+    if (dl === 'downloading') {
+      setDownloading(getDownloadProgress(tr.id));
+      return;
+    }
     if (dl === 'current') setDone();
     else if (dl === 'stale') setStale();
     else if (dl === 'evicted') setEvicted();
@@ -100,37 +115,42 @@ async function wireDownload(tr, card) {
 
   btn.onclick = async () => {
     if (!('caches' in window)) return;
-    btn.disabled = true;
-    btn.textContent = t('downloadingTour');
-    stateEl.innerHTML = `<div class="dl-bar"><i></i></div>`;
-    const bar = $('.dl-bar > i', stateEl);
+    const dl = beginDownload(tr.id, tr.version);
+    setDownloading(0);
     try {
       const urls = await tourAssetUrls(tr, loadTour);
+      if (dl.abort.signal.aborted) return;
       const cache = await caches.open(cn);
       const weights = urls.map((u) => downloadWeight(u, tr.path, tr.cover));
       const totalWeight = weights.reduce((sum, w) => sum + w, 0) || 1;
       let doneWeight = 0;
       let criticalFailed = 0;
-      const setProgress = () => {
-        bar.style.width = `${Math.min(100, Math.round((doneWeight / totalWeight) * 100))}%`;
+      const setProgress = (pct) => {
+        const p = Math.min(99, Math.max(0, Math.round(pct)));
+        setDownloadProgress(tr.id, p);
+        if (card.isConnected) setDownloading(p);
       };
       for (let i = 0; i < urls.length; i++) {
+        if (dl.abort.signal.aborted) throw new DOMException('Aborted', 'AbortError');
         const u = urls[i];
         try {
-          const res = await fetch(u, { cache: 'reload' });
+          const res = await fetch(u, { cache: 'reload', signal: dl.abort.signal });
           if (res.ok) {
             await putCachedUrl(cache, u, res);
           } else if (!isOptionalTourAsset(u, tr.cover)) {
             if (isCriticalTourAsset(u, tr.path)) criticalFailed++;
           }
-        } catch {
+        } catch (err) {
+          if (dl.abort.signal.aborted || err.name === 'AbortError') throw err;
           if (!isOptionalTourAsset(u, tr.cover) && isCriticalTourAsset(u, tr.path)) criticalFailed++;
         }
         doneWeight += weights[i];
-        setProgress();
+        setProgress((doneWeight / totalWeight) * 92);
       }
       if (criticalFailed > 0) {
         await caches.delete(cn);
+        clearTourDownloaded(tr.id);
+        if (!card.isConnected) return;
         btn.disabled = false;
         btn.textContent = t('downloadTour');
         btn.classList.add('warn');
@@ -139,14 +159,21 @@ async function wireDownload(tr, card) {
         stateEl.innerHTML = `<span class="warn-text">⚠︎ ${esc(msg)}</span>`;
         return;
       }
+      setProgress(96);
       await deleteStaleTourCaches(tr.id, cn);
+      setProgress(100);
       markTourDownloaded(tr.id, tr.version);
-      setDone();
-    } catch {
+      if (card.isConnected) setDone();
+    } catch (err) {
       await caches.delete(cn).catch(() => {});
+      clearTourDownloaded(tr.id);
+      if (dl.abort.signal.aborted || err.name === 'AbortError') return;
+      if (!card.isConnected) return;
       btn.disabled = false;
       btn.textContent = t('downloadTour');
       stateEl.innerHTML = `<span class="warn-text">⚠︎ ${esc(t('errorAudioBody'))}</span>`;
+    } finally {
+      endDownload(tr.id);
     }
   };
   refresh();

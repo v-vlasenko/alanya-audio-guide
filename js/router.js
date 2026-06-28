@@ -7,6 +7,7 @@ import {
 } from './player.js';
 import { state } from './state.js';
 import { renderTour, renderHome, resetPageScroll } from './tour.js';
+import { cancelActiveDownloads } from './downloads.js';
 
 export function route() {
   const m = location.hash.match(/^#\/tour\/([\w-]+)/);
@@ -17,6 +18,7 @@ export function route() {
   resetPromptedSet();
 
   if (nextTourId) {
+    cancelActiveDownloads();
     resetPageScroll();
     if (isPlayerOpen() && state.playingTourId && state.playingTourId !== nextTourId && !isPlayerMini()) {
       stopPlayer();

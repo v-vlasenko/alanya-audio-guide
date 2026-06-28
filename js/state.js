@@ -19,4 +19,5 @@ export const state = {
   maxListenedSec: 0,
   mediaSessionReady: false,
   playerReady: false,
+  activeDownloads: new Map(),
 };
