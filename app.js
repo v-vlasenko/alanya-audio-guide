@@ -16,6 +16,37 @@ const t = (k) => STR[k] ?? k;
 const el = (html) => { const d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const cacheName = (id, version) => `tour-${id}-${version}`;
+const assetUrl = (path) => new URL(path, location.href).href;
+
+async function matchCachedUrl(cache, path) {
+  let hit = await cache.match(path);
+  if (hit) return hit;
+  hit = await cache.match(assetUrl(path));
+  if (hit) return hit;
+  return cache.match(new Request(path));
+}
+
+async function putCachedUrl(cache, path, res) {
+  await cache.put(path, res.clone());
+  try { await cache.put(assetUrl(path), res.clone()); } catch { /* quota */ }
+}
+
+async function findTourDownloadCache(id, tourPath) {
+  if (!('caches' in window)) return null;
+  const keys = await caches.keys();
+  const matches = keys.filter((k) => k.startsWith(`tour-${id}-`)).sort().reverse();
+  for (const cn of matches) {
+    const c = await caches.open(cn);
+    if (await matchCachedUrl(c, tourPath)) return cn;
+  }
+  return null;
+}
+
+async function deleteTourDownload(id) {
+  if (!('caches' in window)) return;
+  const keys = await caches.keys();
+  await Promise.all(keys.filter((k) => k.startsWith(`tour-${id}-`)).map((k) => caches.delete(k)));
+}
 const fmtTime = (s) => { s = Math.floor(s || 0); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const haptic = (ms = 10) => navigator.vibrate?.(ms);
 
@@ -49,11 +80,24 @@ const lat2y = (lat, z) => {
 };
 
 /* ---------- boot ---------- */
+async function fetchJsonCached(path) {
+  if ('caches' in window) {
+    for (const key of [path, assetUrl(path)]) {
+      const hit = await caches.match(key);
+      if (hit?.ok) return hit.json();
+    }
+  }
+  if (!navigator.onLine) throw new Error('offline');
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`fetch ${path}`);
+  return res.json();
+}
+
 async function boot() {
   try {
     [STR, INDEX] = await Promise.all([
-      fetch('data/ui-strings-uk.json').then((r) => r.json()),
-      fetch('tours/index.json').then((r) => r.json()),
+      fetchJsonCached('data/ui-strings-uk.json'),
+      fetchJsonCached('tours/index.json'),
     ]);
   } catch (e) {
     app.innerHTML = '<p>Не вдалося завантажити дані. Перевірте з\'єднання та оновіть сторінку.</p>';
@@ -232,15 +276,13 @@ async function wireDownload(tr, card) {
   const cn = cacheName(tr.id, tr.version);
 
   async function isDownloaded() {
-    if (!('caches' in window)) return false;
-    const c = await caches.open(cn);
-    return !!(await c.match(tr.path));
+    return !!(await findTourDownloadCache(tr.id, tr.path));
   }
   function setDone() {
     btn.textContent = t('tourDownloaded'); btn.classList.add('good'); btn.classList.remove('secondary');
     btn.disabled = true;
     state.innerHTML = `<button class="btn ghost sm del">${esc(t('deleteTourDownload'))}</button>`;
-    $('.del', state).onclick = async () => { await caches.delete(cn); refresh(); };
+    $('.del', state).onclick = async () => { await deleteTourDownload(tr.id); refresh(); };
   }
   function setIdle() {
     btn.textContent = t('downloadTour'); btn.disabled = false;
@@ -261,10 +303,12 @@ async function wireDownload(tr, card) {
       for (const u of urls) {
         try {
           const res = await fetch(u, { cache: 'reload' });
-          if (res.ok) await cache.put(u, res.clone());
+          if (res.ok) await putCachedUrl(cache, u, res);
         } catch { /* cover may 404 (placeholder) — ignore */ }
         done++; bar.style.width = `${Math.round((done / urls.length) * 100)}%`;
       }
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k.startsWith(`tour-${tr.id}-`) && k !== cn).map((k) => caches.delete(k)));
       setDone();
     } catch (e) {
       btn.disabled = false; btn.textContent = t('downloadTour');
@@ -304,7 +348,22 @@ async function loadTour(id) {
   if (!tr) throw new Error(`unknown tour ${id}`);
   const cacheKey = `${id}@${tr.version}`;
   if (tourCache.has(cacheKey)) return tourCache.get(cacheKey);
-  const tour = await fetch(tr.path, { cache: 'no-store' }).then((r) => r.json());
+
+  const cn = await findTourDownloadCache(id, tr.path);
+  if (cn) {
+    const hit = await matchCachedUrl(await caches.open(cn), tr.path);
+    if (hit?.ok) {
+      const tour = await hit.json();
+      tourCache.set(cacheKey, tour);
+      return tour;
+    }
+  }
+
+  if (!navigator.onLine) throw new Error('offline');
+
+  const res = await fetch(tr.path, { cache: 'no-store' });
+  if (!res.ok) throw new Error('fetch failed');
+  const tour = await res.json();
   tourCache.set(cacheKey, tour);
   return tour;
 }

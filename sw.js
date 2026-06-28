@@ -3,7 +3,7 @@
    when the app is online. */
 'use strict';
 
-const SHELL = 'shell-v38';
+const SHELL = 'shell-v40';
 const SHELL_ASSETS = [
   './', 'index.html', 'app.css', 'app.js', 'manifest.json',
   'lib/leaflet.js', 'lib/leaflet.css',
@@ -50,6 +50,29 @@ const shellCacheKey = (url) => {
   return hit?.replace(/^\.\//, '') || null;
 };
 
+const isTourAsset = (url) => /\/tours\/[^/]+\//.test(url.pathname);
+
+async function matchAnyCache(req) {
+  const hit = await caches.match(req);
+  if (hit) return hit;
+  const url = new URL(req.url);
+  for (const key of [url.pathname, req.url]) {
+    const byPath = await caches.match(key);
+    if (byPath) return byPath;
+  }
+  const keys = (await caches.keys()).filter((k) => k.startsWith('tour-'));
+  for (const cn of keys) {
+    const c = await caches.open(cn);
+    let hit = await c.match(req);
+    if (hit) return hit;
+    hit = await c.match(url.pathname);
+    if (hit) return hit;
+    hit = await c.match(req.url);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 async function networkFirstShell(req, key) {
   const cache = await caches.open(SHELL);
   try {
@@ -64,14 +87,14 @@ async function networkFirstShell(req, key) {
 }
 
 async function cacheFirst(req, url) {
-  const hit = await caches.match(req);
+  const hit = await matchAnyCache(req);
   if (hit) return hit;
+  if (isTourAsset(url)) throw new Error('offline miss');
   try {
     const res = await fetch(req);
     if (res.ok && shellPath(url)) {
-      const key = shellCacheKey(url);
       const c = await caches.open(SHELL);
-      c.put(key || req, res.clone());
+      c.put(shellCacheKey(url) || req, res.clone());
     }
     return res;
   } catch (err) {
