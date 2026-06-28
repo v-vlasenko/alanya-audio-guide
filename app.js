@@ -72,11 +72,40 @@ async function boot() {
 /* ---------- service worker + offline heal ---------- */
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
+  let pendingReload = false;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!pendingReload) return;
+    pendingReload = false;
+    location.reload();
+  });
+
   navigator.serviceWorker.register('sw.js').then((reg) => {
-    // re-cache shell on every launch (defensive heal vs iOS eviction)
     const heal = () => navigator.serviceWorker.controller?.postMessage({ type: 'heal' });
     if (navigator.serviceWorker.controller) heal();
     else navigator.serviceWorker.addEventListener('controllerchange', heal, { once: true });
+
+    const checkUpdate = () => reg.update().catch(() => {});
+    checkUpdate();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') checkUpdate();
+    });
+
+    const activateWaiting = (worker) => {
+      if (!worker || !navigator.serviceWorker.controller) return;
+      pendingReload = true;
+      worker.postMessage({ type: 'skipWaiting' });
+    };
+
+    if (reg.waiting) activateWaiting(reg.waiting);
+
+    reg.addEventListener('updatefound', () => {
+      const worker = reg.installing;
+      if (!worker) return;
+      worker.addEventListener('statechange', () => {
+        if (worker.state === 'installed') activateWaiting(worker);
+      });
+    });
   }).catch(() => {});
 }
 
