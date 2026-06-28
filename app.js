@@ -290,7 +290,6 @@ async function renderTour(id) {
     </details>
     <div class="tour-toolbar">
       <button class="btn tour-start" id="start">${esc(t('startTour'))}</button>
-      <button class="btn ghost sm btn-reset" id="reset-progress" title="${esc(t('resetProgress'))}">↻</button>
     </div>
     <div class="tabs" role="tablist">
       <button id="tab-list" role="tab" aria-selected="false">${esc(t('tabList'))}</button>
@@ -302,7 +301,6 @@ async function renderTour(id) {
     <div class="player" id="player"></div>
   `;
   $('#back').onclick = () => { location.hash = '#/'; };
-  $('#reset-progress').onclick = () => resetTourProgress(id);
   const savedIdx = loadProgress(id);
   if (savedIdx >= 0 && savedIdx < tour.checkpoints.length) {
     const cp = ordered()[savedIdx];
@@ -819,24 +817,6 @@ function syncMarkDoneBtn() {
   btn.classList.remove('good');
 }
 
-function resetTourProgress(id) {
-  if (!confirm(t('resetProgressConfirm'))) return;
-  haptic(8);
-  localStorage.removeItem('completed-' + id);
-  localStorage.removeItem('visited-' + id);
-  localStorage.removeItem('progress-' + id);
-  completedSet = new Set();
-  stopPlayer();
-  const startBtn = $('#start');
-  if (startBtn) {
-    startBtn.textContent = t('startTour');
-    startBtn.onclick = () => { haptic(); playIndex(0); };
-  }
-  renderList();
-  refreshAllCpPins();
-  toast(t('resetProgressDone'));
-}
-
 /* progress persistence (resume where user left off) */
 function loadProgress(id) { return parseInt(localStorage.getItem('progress-' + id) ?? '-1', 10); }
 function saveProgress(id, idx) { localStorage.setItem('progress-' + id, idx); }
@@ -854,21 +834,12 @@ function showCompletion() {
         <h2>Тур завершено!</h2>
         <p class="muted">${title}</p>
         <div class="completion-actions">
-          <button class="btn" id="comp-share">Поділитися</button>
           <button class="btn secondary" id="comp-home">На головну</button>
           <button class="btn ghost sm" id="comp-replay">Спочатку</button>
         </div>
       </div>
     </div>`);
   document.body.appendChild(overlay);
-  $('#comp-share', overlay).onclick = async () => {
-    haptic();
-    if (navigator.share) {
-      try { await navigator.share({ title: activeTour?.title, url: location.href }); } catch {}
-    } else {
-      try { await navigator.clipboard.writeText(location.href); toast('Посилання скопійовано'); } catch {}
-    }
-  };
   $('#comp-home', overlay).onclick = () => { haptic(); overlay.remove(); location.hash = '#/'; };
   $('#comp-replay', overlay).onclick = () => { haptic(); overlay.remove(); playIndex(0); };
 }
