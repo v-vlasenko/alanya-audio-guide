@@ -7,7 +7,7 @@ import { checkProximity } from './nearby.js';
 import { playById } from './player.js';
 import { isGpsOff, setGpsOff } from './storage.js';
 import { matchGlobalCached } from './cache.js';
-import { esriSatTileUrl, esriStreetTileUrl } from './geo.js';
+import { esriSatTileUrl, osmTileUrl } from './geo.js';
 
 function cpPinHtml(cp) {
   const done = state.completedSet.has(cp.id);
@@ -70,12 +70,29 @@ export async function renderMap() {
     </div>`;
 
   const base = state.activeTour.basePath;
-  let bbox = null;
-  try { bbox = (await fetch(`${base}tiles/meta.json`).then((r) => r.json())).bbox; } catch {}
+  let tileMeta = { zoomMin: 14, zoomMax: 18, bbox: null };
+  try {
+    tileMeta = await fetch(`${base}tiles/meta.json`).then((r) => r.json());
+  } catch { /* no bundled tiles */ }
+  const bbox = tileMeta.bbox;
 
-  state.map = L.map('map', { zoomControl: true, attributionControl: true, doubleClickZoom: true });
+  const nativeMin = tileMeta.zoomMin ?? 14;
+  const nativeMax = tileMeta.zoomMax ?? 18;
 
-  const TILE_OPTS = { minZoom: 14, maxZoom: 19, updateWhenIdle: true, keepBuffer: 3 };
+  state.map = L.map('map', {
+    zoomControl: true,
+    attributionControl: true,
+    doubleClickZoom: true,
+    minZoom: 10,
+    maxZoom: nativeMax,
+  });
+
+  const TILE_OPTS = { minZoom: 10, maxZoom: nativeMax, updateWhenIdle: true, keepBuffer: 3 };
+  const STREET_OPTS = {
+    ...TILE_OPTS,
+    minNativeZoom: nativeMin,
+    maxNativeZoom: nativeMax,
+  };
 
   function makeCachedLayer(tileUrl) {
     return L.TileLayer.extend({
@@ -113,11 +130,12 @@ export async function renderMap() {
         img.alt = '';
         img.onload = () => done(null, img);
         img.onerror = () => done(new Error('tile'), img);
+        const { z, x, y } = coords;
         if (navigator.onLine) {
-          img.src = esriStreetTileUrl(coords.z, coords.x, coords.y);
-          return img;
+          img.src = osmTileUrl(z, x, y);
+        } else {
+          img.src = `${tourBase}tiles/${z}/${x}/${y}.png`;
         }
-        img.src = `${tourBase}tiles/${coords.z}/${coords.x}/${coords.y}.png`;
         return img;
       },
     });
@@ -125,11 +143,13 @@ export async function renderMap() {
 
   const SatelliteLayer = makeCachedLayer((c) => esriSatTileUrl(c.z, c.x, c.y));
   const StreetLayer = makeStreetLayer(base);
+  const streetAttribution =
+    '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
-  let isSat = true;
-  let curLayer = new SatelliteLayer('', { ...TILE_OPTS, attribution: 'Tiles © Esri, Maxar' }).addTo(state.map);
-  $('#layer-btn').textContent = '🗺';
-  $('#layer-btn').title = t('mapStreetTitle');
+  let isSat = false;
+  let curLayer = new StreetLayer('', { ...STREET_OPTS, attribution: streetAttribution }).addTo(state.map);
+  $('#layer-btn').textContent = '🛰';
+  $('#layer-btn').title = t('mapSatelliteTitle');
 
   $('#layer-btn').onclick = () => {
     isSat = !isSat;
@@ -139,7 +159,7 @@ export async function renderMap() {
       $('#layer-btn').textContent = '🗺';
       $('#layer-btn').title = t('mapStreetTitle');
     } else {
-      curLayer = new StreetLayer('', { ...TILE_OPTS, attribution: 'Tiles © Esri' }).addTo(state.map);
+      curLayer = new StreetLayer('', { ...STREET_OPTS, attribution: streetAttribution }).addTo(state.map);
       $('#layer-btn').textContent = '🛰';
       $('#layer-btn').title = t('mapSatelliteTitle');
     }

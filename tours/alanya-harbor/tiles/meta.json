@@ -6,5 +6,6 @@
     "w": 31.9937958
   },
   "zoomMin": 14,
-  "zoomMax": 18
+  "zoomMax": 18,
+  "source": "openmaptiles-osm-bright"
 }

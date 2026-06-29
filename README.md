@@ -32,7 +32,7 @@ GPS and service worker require HTTPS — use the deployed URL for real device te
 
 1. Create `tours/<id>/tour.json` (copy schema from an existing one)
 2. Add MP3s to `tours/<id>/audio/`
-3. Run `node scripts/fetch-tiles.mjs <id>` to download offline map tiles
+3. Run `node scripts/build-osm-tiles.mjs <id>` to render offline OSM map tiles (requires Docker)
 4. Add an entry to `tours/index.json`
 5. Commit + push
 
@@ -47,7 +47,8 @@ To fix: Google Maps → right-click the spot → copy lat,lng → paste into `to
 index.html · js/main.js · app.css · sw.js · manifest.json
 data/ui-strings-uk.json        UI strings
 lib/leaflet.{js,css}           vendored (no CDN)
-scripts/fetch-tiles.mjs        offline tile downloader
+scripts/build-osm-tiles.mjs   offline OSM tile builder (Docker)
+scripts/fetch-tiles.mjs        legacy Esri tile downloader (deprecated)
 tours/index.json               tour catalog (home screen)
 tours/<id>/tour.json           checkpoints, transcripts, coords, waypoints
 tours/<id>/audio/*.mp3         narration
