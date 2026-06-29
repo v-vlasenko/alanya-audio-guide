@@ -194,8 +194,15 @@ export async function renderMap() {
     };
   }
 
-  if (bbox) state.map.fitBounds([[bbox.s, bbox.w], [bbox.n, bbox.e]]);
-  else if (pts.length) state.map.fitBounds(pts, { padding: [30, 30] });
+  const fitTourBounds = () => {
+    const pad = { padding: [30, 30] };
+    if (bbox) state.map.fitBounds([[bbox.s, bbox.w], [bbox.n, bbox.e]], pad);
+    else if (pts.length) state.map.fitBounds(pts, pad);
+    // Bundled tiles only cover the tour bbox; zooming out further shows empty margins offline.
+    if (!navigator.onLine && state.map.getZoom() < nativeMin) state.map.setZoom(nativeMin);
+  };
+
+  fitTourBounds();
   setTimeout(() => { state.map.invalidateSize(); resetPageScroll(); }, 60);
 
   $('#recenter').onclick = () => { if (state.meLayer) state.map.panTo(state.meLayer.getLatLng()); };
@@ -212,8 +219,9 @@ export async function renderMap() {
       if (state.watchId != null) { navigator.geolocation.clearWatch(state.watchId); state.watchId = null; }
       if (state.meLayer) { state.map.removeLayer(state.meLayer); state.meLayer = null; }
       state.didFit = false;
-      if (bbox) state.map.fitBounds([[bbox.s, bbox.w], [bbox.n, bbox.e]]);
+      if (bbox) state.map.fitBounds([[bbox.s, bbox.w], [bbox.n, bbox.e]], { padding: [30, 30] });
       else if (pts.length) state.map.fitBounds(pts, { padding: [30, 30] });
+      if (!navigator.onLine && state.map.getZoom() < nativeMin) state.map.setZoom(nativeMin);
     } else {
       startWatch(bbox, pts);
     }
