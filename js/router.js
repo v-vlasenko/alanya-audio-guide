@@ -23,7 +23,7 @@ export function route() {
     if (isPlayerOpen() && state.playingTourId && state.playingTourId !== nextTourId && !isPlayerMini()) {
       stopPlayer();
     }
-    renderTour(nextTourId);
+    void renderTour(nextTourId).catch(() => { location.hash = '#/'; });
   } else {
     renderHome();
     if (isPlayerOpen()) persistPlayerOnHome();

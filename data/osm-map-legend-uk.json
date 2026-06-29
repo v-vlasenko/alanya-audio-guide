@@ -1,6 +1,9 @@
 {
   "_comment": "OpenStreetMap Carto legend — only features present on Alanya tour maps (harbor + castle + damlatas extracts). Paths first.",
   "summary": "🗺 Позначення на мапі",
+  "sourceNote": "Всі позначення можна знайти ",
+  "sourceLinkLabel": "тут",
+  "sourceUrl": "https://wiki.openstreetmap.org/wiki/OpenStreetMap_Carto/Symbols",
   "pathsTitle": "Шляхи та дороги",
   "symbolsTitle": "Іконки місць",
   "paths": [
@@ -13,8 +16,8 @@
     { "id": "information", "label": "Туристична інформація" },
     { "id": "castle", "label": "Замок або фортеця" },
     { "id": "monument", "label": "Пам'ятник" },
-    { "id": "ruins", "label": "Руїни" },
+    { "id": "archaeological_site", "label": "Археологічна ділянка — місце збереження історичних знахідок" },
     { "id": "memorial", "label": "Меморіал" },
-    { "id": "place_of_worship", "label": "Мечеть або інший храм" },
+    { "id": "place_of_worship", "label": "Мечеть або інший храм" }
   ]
 }

@@ -97,6 +97,8 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .hints-subfold[open] summary{border-bottom:1px solid var(--line)}
 .map-leg-body{padding:8px 12px 10px; font-size:13px; color:var(--muted)}
 .map-leg-intro{margin:0 0 10px; font-size:13px; line-height:1.35}
+.map-leg-source{margin:0 0 8px; font-size:12px; line-height:1.35; color:#8ab4d8}
+.map-leg-source a{color:#9cd4ff; text-decoration:underline; text-underline-offset:2px}
 .map-leg-h{margin:12px 0 6px; font-size:12px; font-weight:800; letter-spacing:.03em; text-transform:uppercase; color:#8ab4d8}
 .map-leg-h:first-of-type{margin-top:0}
 .map-leg-list{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:7px}

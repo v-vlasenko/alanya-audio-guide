@@ -3,7 +3,7 @@
    when the app is online. */
 'use strict';
 
-const SHELL = 'shell-v62';
+const SHELL = 'shell-v64';
 const SHELL_ASSETS = [
   './', 'index.html', 'app.css', 'manifest.json',
   'lib/leaflet.js', 'lib/leaflet.css',
@@ -13,7 +13,7 @@ const SHELL_ASSETS = [
   'icons/osm/restaurant.svg', 'icons/osm/cafe.svg', 'icons/osm/fast_food.svg',
   'icons/osm/bar.svg', 'icons/osm/museum.svg', 'icons/osm/viewpoint.svg',
   'icons/osm/attraction.svg', 'icons/osm/information.svg', 'icons/osm/castle.svg',
-  'icons/osm/monument.svg', 'icons/osm/ruins.svg', 'icons/osm/memorial.svg',
+  'icons/osm/monument.svg', 'icons/osm/archaeological_site.svg', 'icons/osm/memorial.svg',
   'icons/osm/place_of_worship.svg', 'icons/osm/toilets.svg', 'icons/osm/bus_stop.svg',
   'icons/osm/taxi.svg', 'icons/osm/fountain.svg', 'icons/osm/cave_entrance.svg',
   'js/main.js', 'js/dom.js', 'js/geo.js', 'js/icons.js', 'js/constants.js',
