@@ -42,6 +42,14 @@ const lat2y = (lat, z) => {
 const exists = (p) => access(p).then(() => true).catch(() => false);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+function cacheBase(osmPath) {
+  const stem = basename(osmPath).replace(/\.osm\.pbf$/i, '').replace(/\.pbf$/i, '').replace(/\.osm$/i, '');
+  return stem === 'map_full_alanya' ? 'alanya' : stem;
+}
+
+/** Harbor tiles use the full OSM extract bbox so offline panning is not cropped. */
+const TOUR_TILE_BBOX_OSM = { 'alanya-harbor': true };
+
 function parseArgv(argv) {
   const flags = { refresh: false, replaceTours: false, osm: null, tours: [] };
   for (let i = 0; i < argv.length; i++) {
@@ -94,35 +102,37 @@ async function osmBounds(osmPath) {
 
 async function ensurePbf(osmPath, refresh) {
   const low = osmPath.toLowerCase();
-  const pbf = join(CACHE, 'alanya.osm.pbf');
+  const name = cacheBase(osmPath);
+  const pbf = join(CACHE, `${name}.osm.pbf`);
   if (low.endsWith('.pbf') || low.endsWith('.osm.pbf')) {
-    if (resolve(osmPath) === resolve(pbf) && (await exists(pbf))) return pbf;
     if (!refresh && (await exists(pbf))) return pbf;
     await mkdir(CACHE, { recursive: true });
     await copyFile(osmPath, pbf);
     return pbf;
   }
   if (!refresh && (await exists(pbf))) return pbf;
-  console.log('Converting OSM XML → PBF…');
+  console.log(`Converting ${basename(osmPath)} → PBF…`);
   await mkdir(CACHE, { recursive: true });
   dockerRun(
     'iboates/osmium:latest',
-    ['cat', `/in/${basename(osmPath)}`, '-o', '/out/alanya.osm.pbf', '--overwrite'],
+    ['cat', `/in/${basename(osmPath)}`, '-o', `/out/${name}.osm.pbf`, '--overwrite'],
     { entrypoint: 'osmium', mounts: [[dirname(osmPath), '/in', 'ro'], [CACHE, '/out']] },
   );
   return pbf;
 }
 
-async function ensureMbtiles(bounds, refresh) {
-  const mbtiles = join(CACHE, 'alanya.mbtiles');
+async function ensureMbtiles(osmPath, bounds, refresh) {
+  const name = cacheBase(osmPath);
+  const pbfName = `${name}.osm.pbf`;
+  const mbtiles = join(CACHE, `${name}.mbtiles`);
   if (!refresh && (await exists(mbtiles))) return mbtiles;
-  console.log('Building vector MBTiles with Planetiler…');
+  console.log(`Building vector MBTiles (${name}) with Planetiler…`);
   const b = `${bounds.w},${bounds.s},${bounds.e},${bounds.n}`;
   dockerRun(
     'ghcr.io/onthegomap/planetiler:latest',
     [
-      '--osm-path=/data/alanya.osm.pbf',
-      '--output=/data/alanya.mbtiles',
+      `--osm-path=/data/${pbfName}`,
+      `--output=/data/${name}.mbtiles`,
       '--download',
       '--force',
       `--bounds=${b}`,
@@ -134,7 +144,8 @@ async function ensureMbtiles(bounds, refresh) {
   return mbtiles;
 }
 
-async function ensureTileserverConfig(bounds) {
+async function ensureTileserverConfig(osmPath, bounds) {
+  const name = cacheBase(osmPath);
   await mkdir(join(STYLES, RENDER_STYLE), { recursive: true });
   const stylePath = join(STYLES, RENDER_STYLE, 'style.json');
   if (!(await exists(stylePath))) {
@@ -149,7 +160,7 @@ async function ensureTileserverConfig(bounds) {
   }
   const config = {
     options: { paths: { root: '/data', styles: 'styles', mbtiles: '/data' } },
-    data: { openmaptiles: { mbtiles: 'alanya.mbtiles' } },
+    data: { openmaptiles: { mbtiles: `${name}.mbtiles` } },
     styles: {
       [RENDER_STYLE]: {
         style: `${RENDER_STYLE}/style.json`,
@@ -160,7 +171,8 @@ async function ensureTileserverConfig(bounds) {
   await writeFile(join(CACHE, 'config.json'), JSON.stringify(config, null, 2));
 }
 
-async function tourBbox(id) {
+async function tourBbox(id, osmFileBounds = null) {
+  if (TOUR_TILE_BBOX_OSM[id] && osmFileBounds) return { ...osmFileBounds };
   const tour = JSON.parse(await readFile(join(ROOT, 'tours', id, 'tour.json'), 'utf8'));
   const lats = tour.checkpoints.map((c) => c.lat);
   const lngs = tour.checkpoints.map((c) => c.lng);
@@ -178,8 +190,8 @@ async function fetchTile(url, out) {
   return true;
 }
 
-async function renderTourTiles(id, replace) {
-  const bbox = await tourBbox(id);
+async function renderTourTiles(id, replace, osmFileBounds) {
+  const bbox = await tourBbox(id, osmFileBounds);
   const outRoot = join(ROOT, 'tours', id, 'tiles');
   if (replace) await rm(outRoot, { recursive: true, force: true });
   let got = 0, skip = 0, fail = 0;
@@ -242,22 +254,26 @@ async function main() {
     throw new Error(`OSM file not found: ${osmPath} (pass --osm <path>)`);
   }
 
-  if (flags.refresh) await rm(CACHE, { recursive: true, force: true });
+  if (flags.refresh) {
+    const name = cacheBase(osmPath);
+    await rm(join(CACHE, `${name}.osm.pbf`), { force: true });
+    await rm(join(CACHE, `${name}.mbtiles`), { force: true });
+  }
   await mkdir(CACHE, { recursive: true });
 
   const bounds = await osmBounds(osmPath);
   if (!bounds) throw new Error('could not read bounds from OSM file');
 
   await ensurePbf(osmPath, flags.refresh);
-  await ensureMbtiles(bounds, flags.refresh);
-  await ensureTileserverConfig(bounds);
+  await ensureMbtiles(osmPath, bounds, flags.refresh);
+  await ensureTileserverConfig(osmPath, bounds);
 
   const index = JSON.parse(await readFile(join(ROOT, 'tours', 'index.json'), 'utf8'));
   const ids = flags.tours.length ? flags.tours : index.tours.map((t) => t.id);
 
   console.log(`Rendering ${RENDER_STYLE} tiles for ${ids.join(', ')}…`);
   await withTileserver(async () => {
-    for (const id of ids) await renderTourTiles(id, flags.replaceTours);
+    for (const id of ids) await renderTourTiles(id, flags.replaceTours, bounds);
   });
   console.log('done.');
 }

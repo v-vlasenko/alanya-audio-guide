@@ -17,6 +17,7 @@ import { hardRefresh, tryActivateDeferredSw } from './sw-register.js';
 import {
   beginDownload, endDownload, getDownloadProgress, isDownloading, setDownloadProgress,
 } from './downloads.js';
+import { TRASH_ICON } from './icons.js';
 
 function isTourFullyCompletedForCard(id, total) {
   return isTourFullyCompleted(id, total, loadCompleted(id));
@@ -39,9 +40,12 @@ function tourCard(tr) {
           <span>${esc(t('tourCheckpointsLabel'))}: <b>${tr.checkpointCount}</b></span>
         </div>
         <div class="card-actions">
-          <button class="btn secondary dl">${esc(t('downloadTour'))}</button>
+          <div class="dl-row">
+            <button type="button" class="btn secondary dl">${esc(t('downloadTour'))}</button>
+            <button type="button" class="btn icon-btn del" hidden title="${esc(t('deleteTourDownload'))}" aria-label="${esc(t('deleteTourDownload'))}">${TRASH_ICON}</button>
+          </div>
+          <div class="dl-state muted"></div>
         </div>
-        <div class="dl-state muted"></div>
       </div>
     </article>`);
 
@@ -57,6 +61,7 @@ function tourCard(tr) {
 
 async function wireDownload(tr, card) {
   const btn = $('.dl', card);
+  const delBtn = $('.del', card);
   const stateEl = $('.dl-state', card);
   const cn = cacheName(tr.id, tr.version);
 
@@ -65,6 +70,7 @@ async function wireDownload(tr, card) {
     btn.textContent = t('downloadingTour');
     btn.classList.remove('good', 'warn');
     btn.classList.add('secondary');
+    delBtn.hidden = true;
     stateEl.innerHTML = `<div class="dl-bar"><i style="width:${progress}%"></i></div>`;
   }
 
@@ -73,8 +79,8 @@ async function wireDownload(tr, card) {
     btn.classList.add('good');
     btn.classList.remove('secondary', 'warn');
     btn.disabled = true;
-    stateEl.innerHTML = `<button class="btn ghost sm del">${esc(t('deleteTourDownload'))}</button>`;
-    $('.del', stateEl).onclick = async () => { await deleteTourDownload(tr.id); refresh(); };
+    delBtn.hidden = false;
+    stateEl.innerHTML = '';
   }
 
   function setIdle() {
@@ -82,6 +88,7 @@ async function wireDownload(tr, card) {
     btn.disabled = false;
     btn.classList.add('secondary');
     btn.classList.remove('good', 'warn');
+    delBtn.hidden = true;
     stateEl.innerHTML = '';
   }
 
@@ -90,6 +97,7 @@ async function wireDownload(tr, card) {
     btn.disabled = false;
     btn.classList.add('warn');
     btn.classList.remove('secondary', 'good');
+    delBtn.hidden = true;
     stateEl.innerHTML = `<p class="dl-hint warn-text">${esc(t('tourUpdateAvailable'))}</p>`;
   }
 
@@ -98,6 +106,7 @@ async function wireDownload(tr, card) {
     btn.disabled = false;
     btn.classList.add('warn');
     btn.classList.remove('secondary', 'good');
+    delBtn.hidden = true;
     stateEl.innerHTML = `<p class="dl-hint warn-text">${esc(t('tourReDownloadHint'))}</p>`;
   }
 
@@ -112,6 +121,12 @@ async function wireDownload(tr, card) {
     else if (dl === 'evicted') setEvicted();
     else setIdle();
   }
+
+  delBtn.onclick = async (e) => {
+    e.stopPropagation();
+    await deleteTourDownload(tr.id);
+    refresh();
+  };
 
   btn.onclick = async () => {
     if (!('caches' in window)) return;

@@ -12,3 +12,4 @@ export const SKIP_BACK_ICON = `<span class="skip-inner">${REPLAY_ICON}<span clas
 export const SKIP_FWD_ICON = `<span class="skip-inner skip-fwd"><span class="skip-num">5</span>${FORWARD_ICON}</span>`;
 export const PREV_TRACK_ICON = '<svg class="p-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 6h2v12H6V6zm4.5 6l8.5 6V6l-8.5 6z"/></svg>';
 export const NEXT_TRACK_ICON = '<svg class="p-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"/></svg>';
+export const TRASH_ICON = '<svg class="ico-trash" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';

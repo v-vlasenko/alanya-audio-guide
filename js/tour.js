@@ -14,6 +14,7 @@ import {
   buildPlayer, playIndex, isPlayerOpen, markPlaying,
   syncNavButtons, syncMarkDoneBtn,
 } from './player.js';
+import { loadMapLegend, renderMapLegendHtml } from './map-legend.js';
 
 export { renderHome } from './home.js';
 export { resetPageScroll } from './dom.js';
@@ -36,6 +37,8 @@ export async function renderTour(id) {
   state.completedSet = loadCompleted(id);
   resetPromptedSet();
 
+  const mapLegend = renderMapLegendHtml(await loadMapLegend());
+
   app.innerHTML = `
     <div class="topbar">
       <button class="btn ghost sm" id="back">${esc(t('backToTours'))}</button>
@@ -46,6 +49,7 @@ export async function renderTour(id) {
       <div class="hints-body">
         ${tour.tip ? `<p>💡 ${esc(tour.tip)}</p>` : ''}
         <p>${esc(t('gpsKeepOpenTip'))}</p>
+        ${mapLegend}
       </div>
     </details>
     <div class="tabs" role="tablist">

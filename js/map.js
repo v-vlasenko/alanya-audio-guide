@@ -29,6 +29,11 @@ export function syncCpMapPin(cpId) {
 
 export function teardownMap() {
   if (state.watchId != null) { navigator.geolocation.clearWatch(state.watchId); state.watchId = null; }
+  if (state.mapConnHandler) {
+    window.removeEventListener('online', state.mapConnHandler);
+    window.removeEventListener('offline', state.mapConnHandler);
+    state.mapConnHandler = null;
+  }
   if (state.map) { state.map.remove(); state.map = null; }
   state.meLayer = null;
   state.didFit = false;
@@ -58,7 +63,13 @@ function startWatch(bbox, pts) {
 }
 
 export async function renderMap() {
-  if (state.map) { setTimeout(() => state.map.invalidateSize(), 50); return; }
+  if (state.map) {
+    setTimeout(() => {
+      state.map.invalidateSize({ animate: false });
+      state.map.eachLayer((layer) => { if (layer.redraw) layer.redraw(); });
+    }, 50);
+    return;
+  }
   const pane = $('#pane-map');
   pane.innerHTML = `
     <div class="map-wrap">
@@ -87,7 +98,7 @@ export async function renderMap() {
     maxZoom: nativeMax,
   });
 
-  const TILE_OPTS = { minZoom: 10, maxZoom: nativeMax, updateWhenIdle: true, keepBuffer: 3 };
+  const TILE_OPTS = { minZoom: 10, maxZoom: nativeMax, updateWhenIdle: false, keepBuffer: 2 };
   const STREET_OPTS = {
     ...TILE_OPTS,
     minNativeZoom: nativeMin,
@@ -194,16 +205,66 @@ export async function renderMap() {
     };
   }
 
-  const fitTourBounds = () => {
-    const pad = { padding: [30, 30] };
-    if (bbox) state.map.fitBounds([[bbox.s, bbox.w], [bbox.n, bbox.e]], pad);
-    else if (pts.length) state.map.fitBounds(pts, pad);
-    // Bundled tiles only cover the tour bbox; zooming out further shows empty margins offline.
-    if (!navigator.onLine && state.map.getZoom() < nativeMin) state.map.setZoom(nativeMin);
+  const tourCenter = () => {
+    if (pts.length) return L.latLngBounds(pts).getCenter();
+    if (bbox) return [(bbox.s + bbox.n) / 2, (bbox.w + bbox.e) / 2];
+    return state.map.getCenter();
   };
 
-  fitTourBounds();
-  setTimeout(() => { state.map.invalidateSize(); resetPageScroll(); }, 60);
+  const defaultZoomBump = () => {
+    const id = state.activeTour?.id;
+    if (id === 'alanya-damlatas') return 3;
+    if (id === 'alanya-harbor') return 1;
+    return 1;
+  };
+
+  const defaultTourZoom = () => Math.min(nativeMax, nativeMin + defaultZoomBump());
+
+  const syncMapConstraints = () => {
+    if (!state.map) return;
+    if (!navigator.onLine && bbox) {
+      state.map.setMinZoom(defaultTourZoom());
+      state.map.setMaxZoom(nativeMax);
+      state.map.setMaxBounds([[bbox.s, bbox.w], [bbox.n, bbox.e]]);
+      state.map.options.maxBoundsViscosity = 1.0;
+    } else {
+      state.map.setMinZoom(10);
+      state.map.setMaxZoom(nativeMax);
+      state.map.setMaxBounds(null);
+    }
+  };
+
+  const applyMapView = () => {
+    state.map.invalidateSize({ animate: false });
+    syncMapConstraints();
+    const zoom = defaultTourZoom();
+    if (state.activeTour?.id === 'alanya-harbor' && pts.length) {
+      state.map.fitBounds(L.latLngBounds(pts), {
+        paddingTopLeft: [20, 20],
+        paddingBottomRight: [88, 24],
+        maxZoom: zoom,
+        animate: false,
+      });
+    } else {
+      state.map.setView(tourCenter(), zoom, { animate: false });
+    }
+    curLayer.redraw();
+  };
+
+  state.mapConnHandler = () => {
+    syncMapConstraints();
+    if (!navigator.onLine) applyMapView();
+  };
+  window.addEventListener('online', state.mapConnHandler);
+  window.addEventListener('offline', state.mapConnHandler);
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      applyMapView();
+      resetPageScroll();
+    });
+  });
+  setTimeout(applyMapView, 200);
 
   $('#recenter').onclick = () => { if (state.meLayer) state.map.panTo(state.meLayer.getLatLng()); };
 
@@ -219,9 +280,7 @@ export async function renderMap() {
       if (state.watchId != null) { navigator.geolocation.clearWatch(state.watchId); state.watchId = null; }
       if (state.meLayer) { state.map.removeLayer(state.meLayer); state.meLayer = null; }
       state.didFit = false;
-      if (bbox) state.map.fitBounds([[bbox.s, bbox.w], [bbox.n, bbox.e]], { padding: [30, 30] });
-      else if (pts.length) state.map.fitBounds(pts, { padding: [30, 30] });
-      if (!navigator.onLine && state.map.getZoom() < nativeMin) state.map.setZoom(nativeMin);
+      applyMapView();
     } else {
       startWatch(bbox, pts);
     }

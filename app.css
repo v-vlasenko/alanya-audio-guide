@@ -56,9 +56,17 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .tour-body h2{margin-bottom:2px}
 .meta-row{display:flex; flex-wrap:wrap; gap:10px 16px; color:var(--muted); font-size:14px; margin:8px 0 14px}
 .meta-row b{color:var(--fg); font-weight:700}
-.card-actions{display:flex; flex-direction:column; gap:10px}
-.card-actions .btn{width:100%}
-.dl-state{font-size:14px; margin-top:10px}
+.card-actions{display:flex; flex-direction:column; gap:8px}
+.dl-row{display:flex; gap:10px; align-items:stretch}
+.dl-row .dl{flex:1; min-width:0; width:auto}
+.btn.icon-btn{
+  flex:0 0 var(--tap); width:var(--tap); min-width:var(--tap); padding:0;
+  background:var(--bg2); border:1px solid var(--line); color:var(--muted);
+}
+.btn.icon-btn .ico-trash{width:22px; height:22px; display:block}
+.btn.icon-btn:active{color:#e8a0a0; border-color:#6a4040}
+.btn.icon-btn[hidden]{display:none}
+.dl-state{font-size:14px; margin-top:0}
 .dl-bar{height:8px; border-radius:4px; background:var(--line); overflow:hidden; margin-top:8px}
 .dl-bar>i{display:block; height:100%; width:0; background:var(--accent); transition:width .08s linear}
 .best-time{color:#ffd28a; font-size:14px; margin-top:6px}
@@ -83,6 +91,31 @@ button{font:inherit; color:inherit; cursor:pointer; border:0; background:none}
 .hints-fold .hints-body{padding:10px 14px; font-size:14px; line-height:1.4; color:#a8c4d8}
 .hints-fold .hints-body p{margin:0 0 8px}
 .hints-fold .hints-body p:last-child{margin:0}
+.hints-subfold{margin-top:10px; border:1px solid var(--line); border-radius:10px; background:var(--card)}
+.hints-subfold summary{padding:8px 12px; font-size:14px; font-weight:700; color:var(--fg); cursor:pointer; list-style:none}
+.hints-subfold summary::-webkit-details-marker{display:none}
+.hints-subfold[open] summary{border-bottom:1px solid var(--line)}
+.map-leg-body{padding:8px 12px 10px; font-size:13px; color:var(--muted)}
+.map-leg-intro{margin:0 0 10px; font-size:13px; line-height:1.35}
+.map-leg-h{margin:12px 0 6px; font-size:12px; font-weight:800; letter-spacing:.03em; text-transform:uppercase; color:#8ab4d8}
+.map-leg-h:first-of-type{margin-top:0}
+.map-leg-list{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:7px}
+.map-leg-item{display:flex; align-items:center; gap:10px; line-height:1.3}
+.map-leg-item>span{flex:1; min-width:0}
+
+/* line swatches — OSM Carto–like */
+.map-leg-line{
+  flex:0 0 44px; width:44px; height:0; border-radius:2px;
+  border-top-width:5px; border-top-style:solid; background:transparent;
+}
+.map-leg-line--footway{border-top-color:#fa8072; border-top-style:dashed}
+.map-leg-line--steps{border-top-color:#fa8072; border-top-style:dotted}
+
+.map-leg-icon{
+  flex:0 0 24px; width:24px; height:24px; padding:2px;
+  border-radius:4px; background:#f5f0ea; object-fit:contain;
+  border:1px solid #0002;
+}
 
 /* ---- checkpoint list ---- */
 .cp-list{display:flex; flex-direction:column; gap:10px}
