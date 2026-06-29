@@ -158,7 +158,9 @@ export function isCriticalTourAsset(url, tourPath) {
 }
 
 export function isOptionalTourAsset(url, coverPath) {
-  return url === coverPath;
+  if (url === coverPath) return true;
+  if (url.includes('arcgisonline.com')) return true;
+  return false;
 }
 
 /** Relative byte weight for download progress (file-count skews bar when many tiles). */
@@ -166,6 +168,7 @@ export function downloadWeight(url, tourPath, coverPath) {
   if (url.endsWith('.mp3')) return 1000;
   if (url === coverPath || url.endsWith('.jpg') || url.endsWith('.jpeg')) return 300;
   if (url.includes('/tiles/') && url.endsWith('.png')) return 8;
+  if (url.includes('arcgisonline.com')) return 12;
   if (url === tourPath || url.endsWith('.json')) return 2;
   return 10;
 }

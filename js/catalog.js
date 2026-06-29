@@ -1,6 +1,6 @@
 'use strict';
 
-import { lon2x, lat2y } from './geo.js';
+import { lon2x, lat2y, esriSatTileUrl } from './geo.js';
 import {
   matchCachedUrl, readTourJsonFromCaches, findTourDownloadCache,
 } from './cache.js';
@@ -74,8 +74,12 @@ export async function tourAssetUrls(tr, loadTourFn) {
     for (let z = zoomMin; z <= zoomMax; z++) {
       const x0 = lon2x(bbox.w, z), x1 = lon2x(bbox.e, z);
       const y0 = lat2y(bbox.n, z), y1 = lat2y(bbox.s, z);
-      for (let x = x0; x <= x1; x++)
-        for (let y = y0; y <= y1; y++) urls.push(`${base}tiles/${z}/${x}/${y}.png`);
+      for (let x = x0; x <= x1; x++) {
+        for (let y = y0; y <= y1; y++) {
+          urls.push(`${base}tiles/${z}/${x}/${y}.png`);
+          urls.push(esriSatTileUrl(z, x, y));
+        }
+      }
     }
     urls.push(`${base}tiles/meta.json`);
   } catch { /* no tiles yet */ }

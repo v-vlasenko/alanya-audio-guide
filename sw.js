@@ -3,7 +3,7 @@
    when the app is online. */
 'use strict';
 
-const SHELL = 'shell-v47';
+const SHELL = 'shell-v48';
 const SHELL_ASSETS = [
   './', 'index.html', 'app.css', 'manifest.json',
   'lib/leaflet.js', 'lib/leaflet.css',
@@ -94,7 +94,6 @@ async function networkFirstShell(req, key) {
 async function cacheFirst(req, url) {
   const hit = await matchAnyCache(req);
   if (hit) return hit;
-  if (isTourAsset(url)) throw new Error('offline miss');
   try {
     const res = await fetch(req);
     if (res.ok && shellPath(url)) {
@@ -102,14 +101,11 @@ async function cacheFirst(req, url) {
       c.put(shellCacheKey(url) || req, res.clone());
     }
     return res;
-  } catch (err) {
+  } catch {
     if (url.pathname.includes('/tiles/') && url.pathname.endsWith('.png')) {
-      return new Response(
-        Uint8Array.from(atob('R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='), (c) => c.charCodeAt(0)),
-        { headers: { 'Content-Type': 'image/gif' } }
-      );
+      return new Response(null, { status: 404, statusText: 'offline' });
     }
-    throw err;
+    throw new Error('offline');
   }
 }
 

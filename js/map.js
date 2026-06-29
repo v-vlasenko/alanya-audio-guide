@@ -6,6 +6,8 @@ import { state } from './state.js';
 import { checkProximity } from './nearby.js';
 import { playById } from './player.js';
 import { isGpsOff, setGpsOff } from './storage.js';
+import { matchGlobalCached } from './cache.js';
+import { esriSatTileUrl, esriStreetTileUrl } from './geo.js';
 
 function cpPinHtml(cp) {
   const done = state.completedSet.has(cp.id);
@@ -73,39 +75,71 @@ export async function renderMap() {
 
   state.map = L.map('map', { zoomControl: true, attributionControl: true, doubleClickZoom: true });
 
-  const ESRI_STREET_URL = (c) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${c.z}/${c.y}/${c.x}`;
-  const ESRI_SAT_TMPL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+  const TILE_OPTS = { minZoom: 14, maxZoom: 19, updateWhenIdle: true, keepBuffer: 3 };
 
-  function makeHybrid(basePath, fallbackUrl) {
+  function makeCachedLayer(tileUrl) {
     return L.TileLayer.extend({
       createTile(coords, done) {
         const img = document.createElement('img');
         img.alt = '';
-        img.src = `${basePath}tiles/${coords.z}/${coords.x}/${coords.y}.png`;
-        img.onload = () => done(null, img);
-        img.onerror = () => {
-          img.onerror = () => done(new Error('tile'), img);
-          img.src = fallbackUrl(coords);
+        const url = tileUrl(coords);
+        let blobUrl = null;
+        const finish = (err) => {
+          if (blobUrl) URL.revokeObjectURL(blobUrl);
+          if (err) done(err, img);
+          else done(null, img);
         };
+        img.onload = () => finish(null);
+        img.onerror = () => finish(new Error('tile'));
+        (async () => {
+          const hit = await matchGlobalCached(url);
+          if (hit) {
+            blobUrl = URL.createObjectURL(await hit.blob());
+            img.src = blobUrl;
+            return;
+          }
+          if (!navigator.onLine) { finish(new Error('tile')); return; }
+          img.src = url;
+        })();
         return img;
       },
     });
   }
 
-  const HybridStreet = makeHybrid(base, ESRI_STREET_URL);
+  function makeStreetLayer(tourBase) {
+    return L.TileLayer.extend({
+      createTile(coords, done) {
+        const img = document.createElement('img');
+        img.alt = '';
+        img.onload = () => done(null, img);
+        img.onerror = () => done(new Error('tile'), img);
+        if (navigator.onLine) {
+          img.src = esriStreetTileUrl(coords.z, coords.x, coords.y);
+          return img;
+        }
+        img.src = `${tourBase}tiles/${coords.z}/${coords.x}/${coords.y}.png`;
+        return img;
+      },
+    });
+  }
 
-  let isSat = false;
-  let curLayer = new HybridStreet('', { minZoom: 14, maxZoom: 18, attribution: 'Tiles © Esri' }).addTo(state.map);
+  const SatelliteLayer = makeCachedLayer((c) => esriSatTileUrl(c.z, c.x, c.y));
+  const StreetLayer = makeStreetLayer(base);
+
+  let isSat = true;
+  let curLayer = new SatelliteLayer('', { ...TILE_OPTS, attribution: 'Tiles © Esri, Maxar' }).addTo(state.map);
+  $('#layer-btn').textContent = '🗺';
+  $('#layer-btn').title = t('mapStreetTitle');
 
   $('#layer-btn').onclick = () => {
     isSat = !isSat;
     state.map.removeLayer(curLayer);
     if (isSat) {
-      curLayer = L.tileLayer(ESRI_SAT_TMPL, { minZoom: 14, maxZoom: 18, attribution: 'Tiles © Esri, Maxar' }).addTo(state.map);
+      curLayer = new SatelliteLayer('', { ...TILE_OPTS, attribution: 'Tiles © Esri, Maxar' }).addTo(state.map);
       $('#layer-btn').textContent = '🗺';
       $('#layer-btn').title = t('mapStreetTitle');
     } else {
-      curLayer = new HybridStreet('', { minZoom: 14, maxZoom: 18, attribution: 'Tiles © Esri' }).addTo(state.map);
+      curLayer = new StreetLayer('', { ...TILE_OPTS, attribution: 'Tiles © Esri' }).addTo(state.map);
       $('#layer-btn').textContent = '🛰';
       $('#layer-btn').title = t('mapSatelliteTitle');
     }
